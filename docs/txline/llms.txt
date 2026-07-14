@@ -1,0 +1,45 @@
+# TxLINE Documentation
+
+## Docs
+
+- [Activate subscription and retrieve API token](https://txline-docs.txodds.com/api-reference/authentication/activate-subscription-and-retrieve-api-token.md): Activate a user subscription and issue a long-lived API token. Supports three modes based on the on-chain transaction: 1. Legacy subscriptions (pass empty leagues array). 2. Standard matrix subscriptions (pass empty leagues array). 3. Custom matrix subscriptions (pass requested league IDs up to the…
+- [Start a new guest session](https://txline-docs.txodds.com/api-reference/authentication/start-a-new-guest-session.md): Initiates a new, anonymous guest session and returns a JSON Web Token (JWT). This token must be provided as a Bearer token in the Authorization header for subsequent calls, such as the token activation endpoint. This JWT token expires after 30 days.
+- [Get a Merkle proof for a specific fixture update](https://txline-docs.txodds.com/api-reference/fixtures/get-a-merkle-proof-for-a-specific-fixture-update.md): Each fixture returned or referenced in the TxODDS Oracle API is part of an hourly batch of fixture updates. Blockchain holds the Merkle root (ultimate cryptographic containment proof) of each fixture belonging to that batch. This endpoint returns the Merkle proof, i.e., the hashes along the branch o…
+- [Get a Merkle proof for an entire hourly batch of fixtures](https://txline-docs.txodds.com/api-reference/fixtures/get-a-merkle-proof-for-an-entire-hourly-batch-of-fixtures.md): Fixture data is grouped into hourly batches. Each batch is represented by a Merkle Tree, and its root hash is published on-chain. This Merkle root is contained within the batch's metadata.
+- [Get all fixture updates for a single fixture on a given day](https://txline-docs.txodds.com/api-reference/fixtures/get-all-fixture-updates-for-a-single-fixture-on-a-given-day.md)
+- [Get the latest snapshot of fixtures, optionally starting at or within 30 days after a given epoch day](https://txline-docs.txodds.com/api-reference/fixtures/get-the-latest-snapshot-of-fixtures-optionally-starting-at-or-within-30-days-after-a-given-epoch-day.md)
+- [Get a json array of all odd updates from a specific historical 5-minute interval](https://txline-docs.txodds.com/api-reference/odds/get-a-json-array-of-all-odd-updates-from-a-specific-historical-5-minute-interval.md)
+- [Get a Merkle proof for a specific odds update](https://txline-docs.txodds.com/api-reference/odds/get-a-merkle-proof-for-a-specific-odds-update.md): Each odds update is part of a batch whose state is committed to the blockchain via a Merkle root. This endpoint returns the cryptographic proof for a single odds update, identified by its unique messageId. The proof consists of the hashes along the branch of the Merkle tree, which can be used to rec…
+- [Get a real-time Server-Sent Events stream of odds updates](https://txline-docs.txodds.com/api-reference/odds/get-a-real-time-server-sent-events-stream-of-odds-updates.md): A long-lived stream of odds updates.
+- [Get currently live odds updates for a single fixture](https://txline-docs.txodds.com/api-reference/odds/get-currently-live-odds-updates-for-a-single-fixture.md): Return all available odds offers for a single fixture from the current, in-memory 5-minute cache.
+- [Get snapshots of the latest odds for a fixture](https://txline-docs.txodds.com/api-reference/odds/get-snapshots-of-the-latest-odds-for-a-fixture.md): Return the latest odds for each unique market line for a given fixture. If the 'asOf' parameter is provided, the snapshots are taken at that point in time from historical data. Otherwise, it returns the current live snapshot if it exists within the current 5-minutes interval.
+- [Request a partially signed purchase quote given the wallet public key and required TxLINE amount in whole units](https://txline-docs.txodds.com/api-reference/purchase/request-a-partially-signed-purchase-quote-given-the-wallet-public-key-and-required-txline-amount-in-whole-units.md): Authorize and generate a partially signed Solana transaction for purchasing TxLINE utility tokens.
+- [Get a json array of all score updates from a specific historical 5-minute interval (no live data is returned)](https://txline-docs.txodds.com/api-reference/scores/get-a-json-array-of-all-score-updates-from-a-specific-historical-5-minute-interval-no-live-data-is-returned.md)
+- [Get a real-time Server-Sent Events stream of scores updates](https://txline-docs.txodds.com/api-reference/scores/get-a-real-time-server-sent-events-stream-of-scores-updates.md): A long-lived stream of scores updates.
+- [Get a three-stage Merkle proof for a single score statistic](https://txline-docs.txodds.com/api-reference/scores/get-a-three-stage-merkle-proof-for-a-single-score-statistic.md): This endpoint provides a deep cryptographic proof for one or two statistics within a single scores update. The TxODDS Oracle's data is structured in a three-level Merkle hierarchy:
+- [Get snapshots for each action in the latest score events for a fixture](https://txline-docs.txodds.com/api-reference/scores/get-snapshots-for-each-action-in-the-latest-score-events-for-a-fixture.md)
+- [Get the full sequence of score updates for a single fixture](https://txline-docs.txodds.com/api-reference/scores/get-the-full-sequence-of-score-updates-for-a-single-fixture.md): Return a json array of all score updates for a single fixture provided its start time is between two weeks and six hours in the past from current time.
+- [Get the sequence of score updates for a single fixture within the current 5-min interval](https://txline-docs.txodds.com/api-reference/scores/get-the-sequence-of-score-updates-for-a-single-fixture-within-the-current-5-min-interval.md): Return a json array of all score updates for a single fixture included within the current 5-minute interval with live data if it exists.
+- [Fetching Snapshots](https://txline-docs.txodds.com/documentation/examples/fetching-snapshots.md): Retrieve fixtures, odds, and scores data
+- [On-Chain Validation](https://txline-docs.txodds.com/documentation/examples/onchain-validation.md): Validate scores data using cryptographic Merkle proofs
+- [Streaming Data](https://txline-docs.txodds.com/documentation/examples/streaming-data.md): Real-time odds and scores updates via Server-Sent Events
+- [World Cup Hackathon Terms and Conditions](https://txline-docs.txodds.com/documentation/legal/hackathon-terms.md): Official terms and conditions for The TxODDS Hackathon Challenge 2026
+- [Terms and Conditions](https://txline-docs.txodds.com/documentation/legal/terms-and-conditions.md): Terms and conditions for using the TxLINE API
+- [StablePrice Feed](https://txline-docs.txodds.com/documentation/odds/odds-coverage.md): Leagues covered by the odds feed
+- [Overview](https://txline-docs.txodds.com/documentation/odds/overview.md): High-fidelity consensus sports pricing powered by TxODDS and anchored on Solana
+- [Program Addresses](https://txline-docs.txodds.com/documentation/programs/addresses.md): TxLINE Solana program addresses and key accounts
+- [IDL & Types (Devnet)](https://txline-docs.txodds.com/documentation/programs/devnet.md): Interface Definition Language and TypeScript types for TxLINE programs
+- [IDL & Types (Mainnet)](https://txline-docs.txodds.com/documentation/programs/mainnet.md): Interface Definition Language and TypeScript types for TxLINE programs
+- [Quickstart](https://txline-docs.txodds.com/documentation/quickstart.md): Get started with the TxLINE API in minutes
+- [Basketball Feed](https://txline-docs.txodds.com/documentation/scores/basketball-feed.md): TxODDS US Basketball Feed documentation
+- [American Football Feed](https://txline-docs.txodds.com/documentation/scores/football-feed.md): TxODDS US Football Feed documentation
+- [Overview](https://txline-docs.txodds.com/documentation/scores/overview.md): In-venue, scout-verified play-by-play data for US college sports
+- [Schedule](https://txline-docs.txodds.com/documentation/scores/schedule.md): Complete fixture list for all upcoming matches covered by TxLINE
+- [Soccer Feed](https://txline-docs.txodds.com/documentation/scores/soccer-feed.md): TxODDS Soccer Feed documentation
+- [Subscription Tiers](https://txline-docs.txodds.com/documentation/subscription-tiers.md): TxLINE subscription levels and pricing
+- [World Cup Free Tier](https://txline-docs.txodds.com/documentation/worldcup.md): Access World Cup and International Friendlies data for free with TxLINE's complimentary tiers
+
+## OpenAPI Specs
+
+- [docs](https://txline.txodds.com/docs/docs.yaml)
+- [openapi](https://txline-docs.txodds.com/api-reference/openapi.json)
