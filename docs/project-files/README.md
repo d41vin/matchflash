@@ -15,16 +15,18 @@ Everything needed to build MatchFlash for the TxLINE World Cup Hackathon, Consum
 | `04-field-visualization.md`             | The 2.5D field visualization in full — what it can and can't honestly show, and why.                                                         |
 | `05-cnft-and-recap.md`                  | The trophy claim flow, tree provisioning, conservative metadata rules, sharing.                                                              |
 | `06-build-plan.md`                      | Risk-ordered build sequence (no time estimates — Claude Code isn't time-boxed), and an explicit list of what was deliberately cut and why.   |
+| `07-implementation-readiness-decisions.md` | Confirmed implementation-readiness decisions from the design grill. Supersedes any conflicting detail in `00-06` or the reference files. |
 | `terms-and-privacy.md`                  | The actual `/terms` page content — a real deliverable, not implementation guidance.                                                          |
 | `reference/heat.ts`                     | Heat, implemented — now with the possession-intensity contribution path.                                                                     |
 | `reference/impact-score.ts`             | Impact Score, implemented — VAR-by-review-type, two-stage penalties, the narrative bonus, the corrected multiplier tiers.                    |
 | `reference/odds-normalizer.ts`          | Odds normalization — payload shape confirmed accurate; the StablePrice canonical-row hypothesis noted for live confirmation.                 |
 | `reference/stat-keys.ts`                | Stat key encoding — unchanged, re-confirmed against the live spec.                                                                           |
 
-## Five things worth knowing before you start
+## Six things worth knowing before you start
 
 1. **The tournament is further along than it looks from a standing start.** Replay is a first-class experience, not a fallback — see the brief §2.
 2. **Judges may not need a wallet to evaluate this.** The full core experience works signed out; keep it that way.
 3. **TxLINE's data license ends with the hackathon and restricts sharing the Data** — this is why the cNFT metadata is deliberately conservative. See `05` for exactly what's in and out.
 4. **On-chain predicate settlement was seriously considered and deliberately deferred** — a real idea, fully evaluated, documented rather than either dropped silently or forced in. See `03` §7.
 5. **Every "cheap hook, no infrastructure yet" field exists on purpose** — `fixtures.sport`, `prompts.settlementMethod`. Building the infrastructure behind them is future work; the fields cost nothing today.
+6. **07-implementation-readiness-decisions.md** is the single source of truth for implementation decisions. If it conflicts with any other document, the implementation-readiness-decisions.md wins.
