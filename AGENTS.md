@@ -18,3 +18,15 @@ Convex agent skills for common tasks can be installed by running
 `pnpx convex ai-files install`.
 
 <!-- convex-ai-end -->
+
+## Agent skills
+
+### Issue tracker
+
+Issues and specs are local Markdown files under `.scratch/`.
+See `docs/agents/issue-tracker.md`.
+
+### Domain docs
+
+Single-context layout.
+See `docs/agents/domain.md`.
