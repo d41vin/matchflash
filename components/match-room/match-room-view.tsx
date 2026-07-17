@@ -1,5 +1,6 @@
 import Link from "next/link"
 
+import { LiveParticipationControls } from "@/components/match-room/live-participation-controls"
 import type { MatchRoomProjection } from "@/lib/match-room-projection"
 
 export function MatchRoomView({ fixture }: { fixture: MatchRoomProjection }) {
@@ -40,6 +41,10 @@ export function MatchRoomView({ fixture }: { fixture: MatchRoomProjection }) {
           </div>
           <p className="mt-5 text-center text-sm text-slate-400">{fixture.stage}</p>
         </section>
+
+        {fixture.match.status === "live" ? (
+          <LiveParticipationControls fixtureId={fixture.fixtureId} />
+        ) : null}
 
         <section className="mt-5 rounded-3xl border border-dashed border-slate-700 bg-slate-900/60 p-6 sm:p-8">
           <p className="text-xs font-semibold tracking-[0.16em] text-cyan-200">

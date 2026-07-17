@@ -97,7 +97,7 @@ const previewFixtures: FixtureRoomSource[] = [
     participant1: "North Coast",
     participant2: "South Shore",
     startsAt: "2026-07-18T18:00:00.000Z",
-    state: { phase: "upcoming", score1: 0, score2: 0 },
+    state: { phase: "live", minute: 63, score1: 0, score2: 0 },
   },
   {
     fixtureId: 1002,
