@@ -5,7 +5,7 @@ This record captures decisions made during the implementation-readiness grill. I
 ## Data, ingestion, and replay
 
 - MatchFlash uses TxLINE Mainnet service level 12 for the production live experience. The TxLINE connection settings must remain network-consistent.
-- One Railway-hosted Node worker owns the authenticated TxLINE score and odds SSE streams, reconnection, and `Last-Event-ID` resume state. It writes each raw message once and derives shared Convex state once. Browsers never call TxLINE; they subscribe to shared Convex queries. Replay reads stored classified timelines and makes no TxLINE calls.
+- One operator-owned, self-hosted Node worker runs on an already-owned always-on Windows machine and owns the authenticated TxLINE score and odds SSE streams, reconnection, and `Last-Event-ID` resume state. Windows Task Scheduler starts it at boot and restarts it on failure. It makes only outbound TxLINE and Convex connections, writes each raw message once, and derives shared Convex state once. Browsers never call TxLINE; they subscribe to shared Convex queries. Replay reads stored classified timelines and makes no TxLINE calls.
 - Before writing penalty/goal classification, capture a real Mainnet or Devnet stream sequence to establish whether `penalty_outcome: Scored` also emits `goal`. Do not infer a deduplication rule from documentation.
 - Do not display the probability strip or create odds-swing Flash Cards until live discovery confirms the exact StablePrice consensus market and bookmaker row. Never substitute an arbitrary bookmaker line.
 - The schematic formation layer may ship only after an observed `unitId` mapping is verified. Phase 1 field visualization remains the honest baseline if it is not.
