@@ -30,10 +30,39 @@ export const schema = defineSchema({
     updatedAt: v.number(),
   }).index("by_fixtureId", ["fixtureId"]),
 
+  // This is the immutable capture boundary between TxLINE and every later
+  // projection. Some administrative source messages do not name a fixture,
+  // but are retained so a stream session can be audited faithfully.
+  txlineEvents: defineTable({
+    source: v.union(v.literal("scores"), v.literal("odds")),
+    sourceEventId: v.string(),
+    sseEventId: v.optional(v.string()),
+    fixtureId: v.optional(v.number()),
+    eventType: v.string(),
+    sequence: v.optional(v.number()),
+    occurredAt: v.optional(v.number()),
+    raw: v.any(),
+    capturedAt: v.number(),
+  })
+    .index("by_source_and_sourceEventId", ["source", "sourceEventId"])
+    .index("by_fixtureId_and_capturedAt", ["fixtureId", "capturedAt"]),
+
+  // Updated in the same transaction as a raw write. This is the durable
+  // Last-Event-ID checkpoint used after a process, power, or network failure.
+  txlineStreamCheckpoints: defineTable({
+    source: v.union(v.literal("scores"), v.literal("odds")),
+    lastEventId: v.string(),
+    updatedAt: v.number(),
+  }).index("by_source", ["source"]),
+
   liveReactions: defineTable({
     fixtureId: v.number(),
     userId: v.id("users"),
-    reaction: v.union(v.literal("cheer"), v.literal("wow"), v.literal("nervous")),
+    reaction: v.union(
+      v.literal("cheer"),
+      v.literal("wow"),
+      v.literal("nervous")
+    ),
     createdAt: v.number(),
   })
     .index("by_fixtureId", ["fixtureId"])

@@ -9,6 +9,7 @@
     "start": "next start",
     "lint": "eslint",
     "test": "node --test --experimental-strip-types \"tests/**/*.test.ts\"",
+    "worker:txline": "node --env-file=.env.worker --experimental-strip-types workers/txline-worker.ts",
     "format": "prettier --write \"**/*.{ts,tsx}\"",
     "typecheck": "tsc --noEmit"
   },
