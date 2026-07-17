@@ -14,7 +14,9 @@
   },
   "dependencies": {
     "@base-ui/react": "^1.6.0",
+    "@phantom/react-sdk": "^2.0.2",
     "@shadcn/react": "^0.2.1",
+    "@solana/web3.js": "^1.98.4",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
