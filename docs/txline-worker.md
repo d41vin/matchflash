@@ -13,8 +13,8 @@ Ticket 03 runs one persistent, outbound-only Node process. It owns the authentic
    pnpm.cmd exec convex env set MATCHFLASH_WORKER_SECRET $secret
    ```
 
-   Copy `.env.worker.example` to `.env.worker` and populate `TXLINE_API_TOKEN`, `CONVEX_SITE_URL`, and `MATCHFLASH_WORKER_SECRET` (paste `$secret` for the last value). `CONVEX_SITE_URL` is the deployment's `NEXT_PUBLIC_CONVEX_SITE_URL` value. The secret protects the two Convex HTTP ingress routes, which in turn call the private ingestion functions; never add it to `.env.local`, source control, or a browser variable. The worker renews its guest JWT after a 401, so `TXLINE_GUEST_JWT` may be left blank. Before deploying, also configure the project's existing Convex auth environment values; the current deployment reports `MATCHFLASH_AUTH_ISSUER` as unset.
-4. Deploy the Convex schema and functions, then run `pnpm worker:txline` once from the repository. You should see separate `scores` and `odds` capture messages. Stop it with Ctrl+C after confirming both streams connect.
+   Copy `.env.worker.example` to `.env.worker` and populate `TXLINE_API_TOKEN`, `CONVEX_SITE_URL`, and `MATCHFLASH_WORKER_SECRET` (paste `$secret` for the last value). `CONVEX_SITE_URL` is the deployment's HTTP actions site URL, in the form `https://<deployment>.convex.site` (not the browser client URL ending in `.convex.cloud`). The secret protects the two Convex HTTP ingress routes, which in turn call the private ingestion functions; never add it to `.env.local`, source control, or a browser variable. The worker renews its guest JWT after a 401, so `TXLINE_GUEST_JWT` may be left blank. Before deploying, also configure the project's existing Convex auth environment values; the current deployment reports `MATCHFLASH_AUTH_ISSUER` as unset.
+4. Deploy the Convex schema and functions, then run `pnpm worker:txline` once from the repository. You should see separate `scores` and `odds` connection messages (and capture messages whenever TxLINE emits non-heartbeat frames). Stop it with Ctrl+C after confirming both streams connect.
 
 ## Windows Task Scheduler
 

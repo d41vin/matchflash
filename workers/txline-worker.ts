@@ -108,13 +108,17 @@ function convexIngestionClient(config: WorkerConfig): IngestionClient {
 }
 
 class TxlineCredentials {
+  private readonly apiOrigin: string
+  private readonly apiToken: string
   private guestJwt?: string
 
   constructor(
-    private readonly apiOrigin: string,
-    private readonly apiToken: string,
+    apiOrigin: string,
+    apiToken: string,
     initialGuestJwt?: string
   ) {
+    this.apiOrigin = apiOrigin
+    this.apiToken = apiToken
     this.guestJwt = initialGuestJwt
   }
 
@@ -222,6 +226,9 @@ async function consumeStream(
       }
 
       failures = 0
+      console.info(
+        `[${source}] connected to TxLINE SSE stream${checkpoint ? ` from checkpoint ${checkpoint}` : ""}.`
+      )
       for await (const event of parseSseAsync(readableChunks(response.body))) {
         if (shouldIgnoreSseEvent(event)) {
           continue
