@@ -106,7 +106,7 @@ function MatchFlashAuthProvider({ children }: PropsWithChildren) {
       return
     }
 
-    if (pathname === "/txline-devnet") {
+    if (pathname.startsWith("/txline-")) {
       return
     }
 

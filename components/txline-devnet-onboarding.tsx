@@ -80,7 +80,10 @@ function TxlineOnboarding({ network }: { network: "devnet" | "mainnet" }) {
       const guest = await readJson<{ token: string }>(
         await fetch(`/api/txline/${network}/guest`, { method: "POST" })
       )
-      const connection = new Connection(txline.rpcUrl, "confirmed")
+      const rpcUrl = isMainnet
+        ? `${window.location.origin}/api/txline/mainnet/rpc`
+        : txline.rpcUrl
+      const connection = new Connection(rpcUrl, "confirmed")
       if (isMainnet) {
         const account = await buildMainnetTokenAccountTransaction(
           connection,
