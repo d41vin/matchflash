@@ -50,14 +50,22 @@ export function apiTokenFromActivationResponse(payload: unknown) {
   if (typeof payload === "string" && payload.length > 0) {
     return payload
   }
-  if (
-    typeof payload === "object" &&
-    payload !== null &&
-    typeof (payload as { token?: unknown }).token === "string" &&
-    (payload as { token: string }).token.length > 0
-  ) {
-    return (payload as { token: string }).token
+
+  if (typeof payload === "object" && payload !== null) {
+    const response = payload as Record<string, unknown>
+    for (const field of ["token", "apiToken", "api_token"] as const) {
+      if (typeof response[field] === "string" && response[field].length > 0) {
+        return response[field]
+      }
+    }
+    if (typeof response.data === "string" && response.data.length > 0) {
+      return response.data
+    }
+    if (typeof response.data === "object" && response.data !== null) {
+      return apiTokenFromActivationResponse(response.data)
+    }
   }
+
   throw new Error("TxLINE activation returned no API token.")
 }
 

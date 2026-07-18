@@ -86,6 +86,10 @@ test("formats standard-bundle activation and validates its API token response", 
     apiTokenFromActivationResponse({ token: "api-token" }),
     "api-token"
   )
+  assert.equal(
+    apiTokenFromActivationResponse({ data: { apiToken: "api-token" } }),
+    "api-token"
+  )
   assert.equal(apiTokenFromActivationResponse("api-token"), "api-token")
   assert.throws(() => apiTokenFromActivationResponse({}), /no API token/)
 })
