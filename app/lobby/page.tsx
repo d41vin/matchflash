@@ -1,13 +1,12 @@
-import { FixtureCard } from "@/components/match-room/fixture-card"
-import { listLobbyFixtures } from "@/lib/match-room-projection"
+import { LobbyFixtures } from "@/components/match-room/lobby-fixtures"
 
 export default function LobbyPage() {
-  const fixtures = listLobbyFixtures()
-
   return (
     <main className="min-h-svh bg-slate-950 px-4 py-8 text-slate-100 sm:px-8 sm:py-12">
       <div className="mx-auto max-w-3xl">
-        <p className="text-sm font-semibold tracking-[0.18em] text-cyan-200">MATCHFLASH</p>
+        <p className="text-sm font-semibold tracking-[0.18em] text-cyan-200">
+          MATCHFLASH
+        </p>
         <h1 className="mt-3 max-w-xl text-4xl font-black tracking-tight text-white sm:text-5xl">
           Every fixture has one place to follow.
         </h1>
@@ -22,17 +21,18 @@ export default function LobbyPage() {
               <p className="text-xs font-semibold tracking-[0.16em] text-cyan-200">
                 SOCCER
               </p>
-              <h2 id="fixtures-title" className="mt-2 text-2xl font-bold text-white">
+              <h2
+                id="fixtures-title"
+                className="mt-2 text-2xl font-bold text-white"
+              >
                 Fixtures
               </h2>
             </div>
-            <p className="text-right text-xs text-slate-400">Preview data</p>
+            <p className="text-right text-xs text-slate-400">
+              Live fixture feed
+            </p>
           </div>
-          <div className="mt-5 grid gap-4">
-            {fixtures.map((fixture) => (
-              <FixtureCard fixture={fixture} key={fixture.fixtureId} />
-            ))}
-          </div>
+          <LobbyFixtures />
         </section>
       </div>
     </main>

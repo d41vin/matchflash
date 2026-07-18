@@ -1,8 +1,18 @@
+"use client"
+
 import Link from "next/link"
 
 import type { MatchRoomProjection } from "@/lib/match-room-projection"
 
+import {
+  fixtureHasReliabilityWarning,
+  useFixtureFeedHealth,
+} from "./fixture-feed-notice"
+
 export function FixtureCard({ fixture }: { fixture: MatchRoomProjection }) {
+  const health = useFixtureFeedHealth(fixture)
+  const hasReliabilityWarning = fixtureHasReliabilityWarning(fixture)
+
   return (
     <Link
       aria-label={`Open Match Room: ${fixture.participant1} versus ${fixture.participant2}`}
@@ -14,15 +24,24 @@ export function FixtureCard({ fixture }: { fixture: MatchRoomProjection }) {
         <span className="text-slate-400">{fixture.stage}</span>
       </div>
       <div className="mt-5 grid grid-cols-[1fr_auto_1fr] items-center gap-3 text-center">
-        <p className="text-lg font-semibold text-white">{fixture.participant1}</p>
+        <p className="text-lg font-semibold text-white">
+          {fixture.participant1}
+        </p>
         <p className="rounded-xl bg-slate-950 px-3 py-2 font-mono text-xl font-bold text-white">
           {fixture.match.score1}–{fixture.match.score2}
         </p>
-        <p className="text-lg font-semibold text-white">{fixture.participant2}</p>
+        <p className="text-lg font-semibold text-white">
+          {fixture.participant2}
+        </p>
       </div>
       <p className="mt-5 text-sm text-slate-400 group-hover:text-slate-200">
         Open the global Match Room <span aria-hidden="true">→</span>
       </p>
+      {health === "stale" || hasReliabilityWarning ? (
+        <p className="mt-3 text-xs font-semibold text-amber-200">
+          {health === "stale" ? "Live data delayed" : "Data quality notice"}
+        </p>
+      ) : null}
     </Link>
   )
 }

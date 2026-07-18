@@ -30,6 +30,54 @@ export const schema = defineSchema({
     updatedAt: v.number(),
   }).index("by_fixtureId", ["fixtureId"]),
 
+  // Stable fixture identity is separate from high-churn match state so
+  // scoreboard writes do not rewrite fixture metadata for every viewer.
+  fixtures: defineTable({
+    fixtureId: v.number(),
+    sport: v.literal("soccer"),
+    competition: v.string(),
+    stage: v.string(),
+    participant1: v.string(),
+    participant2: v.string(),
+    startsAt: v.string(),
+    lastTxlineTs: v.optional(v.number()),
+  }).index("by_fixtureId", ["fixtureId"]),
+
+  // This is the worker-owned, reconciled scoreboard state. It deliberately
+  // contains no provider envelope and is the source for anonymous viewers.
+  matchStates: defineTable({
+    fixtureId: v.number(),
+    phase: v.union(
+      v.literal("upcoming"),
+      v.literal("live"),
+      v.literal("final")
+    ),
+    statusId: v.optional(v.number()),
+    score1: v.number(),
+    score2: v.number(),
+    reliability: v.object({
+      cornersReliable: v.boolean(),
+      cardsReliable: v.boolean(),
+      dataSuspended: v.boolean(),
+      periodSuspectSinceAdjustment: v.optional(v.boolean()),
+    }),
+    lastScoreSeq: v.optional(v.number()),
+    // The source heartbeat used to detect that a live display has gone stale.
+    updatedAt: v.number(),
+  }).index("by_fixtureId", ["fixtureId"]),
+
+  // Mutable action records are internal reconciliation state. Source payloads
+  // remain available only at the raw capture boundary and never reach a query.
+  fixtureActions: defineTable({
+    fixtureId: v.number(),
+    actionId: v.number(),
+    action: v.string(),
+    sequence: v.optional(v.number()),
+    discarded: v.boolean(),
+    payload: v.any(),
+    updatedAt: v.number(),
+  }).index("by_fixtureId_and_actionId", ["fixtureId", "actionId"]),
+
   // This is the immutable capture boundary between TxLINE and every later
   // projection. Some administrative source messages do not name a fixture,
   // but are retained so a stream session can be audited faithfully.

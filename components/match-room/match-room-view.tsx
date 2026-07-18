@@ -3,6 +3,8 @@ import Link from "next/link"
 import { LiveParticipationControls } from "@/components/match-room/live-participation-controls"
 import type { MatchRoomProjection } from "@/lib/match-room-projection"
 
+import { FixtureFeedNotice } from "./fixture-feed-notice"
+
 export function MatchRoomView({ fixture }: { fixture: MatchRoomProjection }) {
   return (
     <main className="min-h-svh bg-slate-950 px-4 py-6 text-slate-100 sm:px-8 sm:py-10">
@@ -37,10 +39,16 @@ export function MatchRoomView({ fixture }: { fixture: MatchRoomProjection }) {
             <p className="rounded-2xl bg-slate-950 px-4 py-3 font-mono text-3xl font-bold sm:text-5xl">
               {fixture.match.score1}–{fixture.match.score2}
             </p>
-            <p className="text-xl font-bold sm:text-3xl">{fixture.participant2}</p>
+            <p className="text-xl font-bold sm:text-3xl">
+              {fixture.participant2}
+            </p>
           </div>
-          <p className="mt-5 text-center text-sm text-slate-400">{fixture.stage}</p>
+          <p className="mt-5 text-center text-sm text-slate-400">
+            {fixture.stage}
+          </p>
         </section>
+
+        <FixtureFeedNotice fixture={fixture} />
 
         {fixture.match.status === "live" ? (
           <LiveParticipationControls fixtureId={fixture.fixtureId} />
@@ -50,7 +58,9 @@ export function MatchRoomView({ fixture }: { fixture: MatchRoomProjection }) {
           <p className="text-xs font-semibold tracking-[0.16em] text-cyan-200">
             MATCH SIGNALS
           </p>
-          <h2 className="mt-3 text-xl font-bold text-white">Following this fixture together</h2>
+          <h2 className="mt-3 text-xl font-bold text-white">
+            Following this fixture together
+          </h2>
           <p className="mt-2 max-w-prose text-sm leading-6 text-slate-300">
             This global room is open to everyone. Confirmed match signals will
             appear here as the fixture projection is connected to live data.
