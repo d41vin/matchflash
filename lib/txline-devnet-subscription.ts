@@ -163,6 +163,29 @@ export async function buildMainnetSubscriptionTransaction(
   return buildTxlineSubscriptionTransaction(TXLINE_MAINNET, connection, user)
 }
 
+export async function buildMainnetTokenAccountTransaction(
+  connection: DevnetSubscriptionConnection,
+  user: PublicKey
+) {
+  const { userTokenAccount } = createMainnetSubscribeInstruction(user)
+  if ((await connection.getAccountInfo(userTokenAccount)) !== null) return null
+
+  const latestBlockhash = await connection.getLatestBlockhash("confirmed")
+  const transaction = new Transaction().add(
+    createAssociatedTokenAccountInstruction(
+      user,
+      userTokenAccount,
+      user,
+      TXLINE_MAINNET.tokenMint,
+      TOKEN_2022_PROGRAM_ID,
+      ASSOCIATED_TOKEN_PROGRAM_ID
+    )
+  )
+  transaction.feePayer = user
+  transaction.recentBlockhash = latestBlockhash.blockhash
+  return { latestBlockhash, transaction }
+}
+
 async function buildTxlineSubscriptionTransaction(
   config: TxlineSubscriptionConfig,
   connection: DevnetSubscriptionConnection,

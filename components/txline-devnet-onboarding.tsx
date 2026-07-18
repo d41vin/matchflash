@@ -9,6 +9,7 @@ import {
   apiTokenFromActivationResponse,
   buildDevnetSubscriptionTransaction,
   buildMainnetSubscriptionTransaction,
+  buildMainnetTokenAccountTransaction,
   preflightDevnetSubscription,
   TXLINE_DEVNET,
   TXLINE_MAINNET,
@@ -80,6 +81,28 @@ function TxlineOnboarding({ network }: { network: "devnet" | "mainnet" }) {
         await fetch(`/api/txline/${network}/guest`, { method: "POST" })
       )
       const connection = new Connection(txline.rpcUrl, "confirmed")
+      if (isMainnet) {
+        const account = await buildMainnetTokenAccountTransaction(
+          connection,
+          new PublicKey(solana.publicKey)
+        )
+        if (account) {
+          await preflightDevnetSubscription(connection, account.transaction)
+          const sentAccount = await solana.signAndSendTransaction(
+            account.transaction
+          )
+          await connection.confirmTransaction(
+            {
+              signature: sentAccount.signature,
+              blockhash: account.latestBlockhash.blockhash,
+              lastValidBlockHeight: account.latestBlockhash.lastValidBlockHeight,
+            },
+            "confirmed"
+          )
+          setCreatedTokenAccount(true)
+          await new Promise((resolve) => setTimeout(resolve, 3000))
+        }
+      }
       const built = await (isMainnet
         ? buildMainnetSubscriptionTransaction(
             connection,
