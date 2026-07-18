@@ -25,7 +25,7 @@ Register-ScheduledTask -TaskName "MatchFlash TxLINE worker" -Xml (Get-Content -R
 Start-ScheduledTask -TaskName "MatchFlash TxLINE worker"
 ```
 
-It starts one minute after boot, waits for networking, runs as LocalSystem, and retries failure every minute. The task uses the checked-in absolute workspace path; if this repository moves, update the two paths in `scripts/matchflash-txline-worker.xml` before registering it again.
+It starts one minute after boot, waits for networking, runs as LocalSystem (the built-in `S-1-5-18` account), and retries failure every minute. The task uses the checked-in absolute workspace path; if this repository moves, update the two paths in `scripts/matchflash-txline-worker.xml` before registering it again.
 
 Check it with:
 
