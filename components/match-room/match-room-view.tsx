@@ -7,6 +7,7 @@ import { FixtureFeedNotice } from "./fixture-feed-notice"
 import { FieldVisualization } from "./field-visualization"
 import { OddsPresentation } from "./odds-presentation"
 import { ReplayMatchRoom } from "./replay-match-room"
+import { SocialRooms } from "./social-rooms"
 
 export function MatchRoomView({ fixture }: { fixture: MatchRoomProjection }) {
   return (
@@ -85,6 +86,8 @@ export function MatchRoomView({ fixture }: { fixture: MatchRoomProjection }) {
             </section>
           </>
         )}
+
+        <SocialRooms fixtureId={fixture.fixtureId} />
       </div>
     </main>
   )

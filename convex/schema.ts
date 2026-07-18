@@ -198,6 +198,52 @@ export const schema = defineSchema({
     confirmedAt: v.number(),
   }).index("by_key", ["key"]),
 
+  // The global Match Room is created with its fixture. Public and private
+  // Rooms are optional social spaces layered on top of that anonymous view.
+  rooms: defineTable({
+    fixtureId: v.number(),
+    kind: v.union(
+      v.literal("global"),
+      v.literal("public"),
+      v.literal("private")
+    ),
+    name: v.string(),
+    hostUserId: v.optional(v.id("users")),
+    createdAt: v.number(),
+    frozen: v.boolean(),
+  })
+    .index("by_fixtureId", ["fixtureId"])
+    .index("by_fixtureId_and_kind", ["fixtureId", "kind"]),
+
+  roomMembers: defineTable({
+    roomId: v.id("rooms"),
+    fixtureId: v.number(),
+    userId: v.id("users"),
+    joinedAt: v.number(),
+    // Predictions are introduced in ticket 11. Keeping the aggregate here
+    // lets standings remain a bounded room read until then.
+    score: v.number(),
+  })
+    .index("by_roomId", ["roomId"])
+    .index("by_roomId_and_userId", ["roomId", "userId"])
+    .index("by_roomId_and_score", ["roomId", "score"])
+    .index("by_fixtureId_and_userId", ["fixtureId", "userId"]),
+
+  roomReactions: defineTable({
+    fixtureId: v.number(),
+    flashCardId: v.id("flashCards"),
+    roomId: v.id("rooms"),
+    userId: v.id("users"),
+    reaction: v.union(
+      v.literal("cheer"),
+      v.literal("wow"),
+      v.literal("nervous")
+    ),
+    createdAt: v.number(),
+  })
+    .index("by_roomId_and_flashCardId", ["roomId", "flashCardId"])
+    .index("by_fixtureId_and_createdAt", ["fixtureId", "createdAt"]),
+
   liveReactions: defineTable({
     fixtureId: v.number(),
     userId: v.id("users"),

@@ -15,6 +15,7 @@ import {
   shouldApplyPossessionContribution,
 } from "../lib/heat"
 import { applyFlashHeat } from "./heat"
+import { ensureGlobalRoom } from "./rooms"
 import type { MatchFlashDataModel } from "./schema"
 import type { Id } from "./_generated/dataModel"
 
@@ -355,6 +356,13 @@ async function persistReconciledFixture(
   } else {
     await db.insert("matchStates", reconciled.state)
   }
+
+  await ensureGlobalRoom(
+    db,
+    reconciled.state.fixtureId,
+    reconciled.state.phase === "final",
+    capturedAt
+  )
 
   const participationState = await db
     .query("fixtureStates")
