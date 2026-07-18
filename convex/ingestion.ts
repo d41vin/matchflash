@@ -12,6 +12,7 @@ import {
 } from "./_generated/server"
 import type { MatchFlashDataModel } from "./schema"
 import { reconcileCapturedScoreEvent } from "./reconciliation"
+import { reconcileCapturedOddsEvent } from "./odds"
 
 export const sourceValidator = v.union(v.literal("scores"), v.literal("odds"))
 
@@ -92,6 +93,13 @@ export const captureRawEvent = internalMutation({
     await db.insert("txlineEvents", { ...args, capturedAt })
     if (args.source === "scores") {
       await reconcileCapturedScoreEvent(db, args.raw, capturedAt)
+    } else {
+      await reconcileCapturedOddsEvent(
+        db,
+        args.raw,
+        args.sourceEventId,
+        capturedAt
+      )
     }
     return { stored: true }
   },

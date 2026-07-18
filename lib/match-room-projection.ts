@@ -27,6 +27,16 @@ export type FixtureRoomSource = {
       intensity: "safe" | "attack" | "danger" | "highDanger"
       since: number
     }
+    winProb1?: number
+    drawProb?: number
+    winProb2?: number
+    oddsProvenance?: {
+      bookmaker: string
+      bookmakerId: number
+      superOddsType: string
+      marketPeriod?: string
+      asOfTs: number
+    }
     updatedAt: number
   }
   rawProviderPayload?: unknown
@@ -63,6 +73,22 @@ export type MatchRoomProjection = {
   field: {
     possession?: FixtureRoomSource["state"]["possession"]
   }
+  odds:
+    | { availability: "unavailable" }
+    | {
+        availability: "available"
+        home: number
+        draw: number
+        away: number
+        provenance: NonNullable<FixtureRoomSource["state"]["oddsProvenance"]>
+      }
+}
+
+export type ConfirmedOddsRow = {
+  bookmaker: string
+  bookmakerId: number
+  superOddsType: string
+  marketPeriod?: string
 }
 
 const FEED_STALE_AFTER_MS = 90_000
@@ -85,7 +111,8 @@ function statusLabel(state: FixtureRoomSource["state"], startsAt: string) {
 
 export function projectMatchRoom(
   source: FixtureRoomSource,
-  now = source.state.updatedAt
+  now = source.state.updatedAt,
+  confirmedOddsRow?: ConfirmedOddsRow
 ): MatchRoomProjection {
   const {
     fixtureId,
@@ -129,5 +156,23 @@ export function projectMatchRoom(
     field: {
       ...(state.possession ? { possession: state.possession } : {}),
     },
+    odds:
+      state.winProb1 !== undefined &&
+      state.drawProb !== undefined &&
+      state.winProb2 !== undefined &&
+      state.oddsProvenance &&
+      confirmedOddsRow &&
+      state.oddsProvenance.bookmaker === confirmedOddsRow.bookmaker &&
+      state.oddsProvenance.bookmakerId === confirmedOddsRow.bookmakerId &&
+      state.oddsProvenance.superOddsType === confirmedOddsRow.superOddsType &&
+      state.oddsProvenance.marketPeriod === confirmedOddsRow.marketPeriod
+        ? {
+            availability: "available",
+            home: state.winProb1,
+            draw: state.drawProb,
+            away: state.winProb2,
+            provenance: state.oddsProvenance,
+          }
+        : { availability: "unavailable" },
   }
 }

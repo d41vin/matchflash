@@ -79,6 +79,19 @@ export const schema = defineSchema({
         since: v.number(),
       })
     ),
+    winProb1: v.optional(v.number()),
+    drawProb: v.optional(v.number()),
+    winProb2: v.optional(v.number()),
+    // Present only when an operator has confirmed an observed StablePrice row.
+    oddsProvenance: v.optional(
+      v.object({
+        bookmaker: v.string(),
+        bookmakerId: v.number(),
+        superOddsType: v.string(),
+        marketPeriod: v.optional(v.string()),
+        asOfTs: v.number(),
+      })
+    ),
     // The source heartbeat used to detect that a live display has gone stale.
     updatedAt: v.number(),
   })
@@ -103,17 +116,23 @@ export const schema = defineSchema({
   // from the public timeline.
   flashCards: defineTable({
     fixtureId: v.number(),
-    actionId: v.number(),
+    // Score actions use provider numeric ids; odds rows use their immutable
+    // source-event id so each observed swing remains correction-safe.
+    actionId: v.union(v.number(), v.string()),
     type: v.union(
       v.literal("goal"),
       v.literal("card"),
       v.literal("corner"),
+      v.literal("oddsSwing"),
       v.literal("varReview"),
       v.literal("varResolved"),
       v.literal("phaseChange")
     ),
     title: v.string(),
     participant: v.optional(v.union(v.literal(1), v.literal(2))),
+    probBefore: v.optional(v.number()),
+    probAfter: v.optional(v.number()),
+    oddsTaxonomyKey: v.optional(v.string()),
     impactScore: v.optional(v.number()),
     confirmed: v.literal(true),
     retracted: v.boolean(),
@@ -147,6 +166,37 @@ export const schema = defineSchema({
     lastEventId: v.string(),
     updatedAt: v.number(),
   }).index("by_source", ["source"]),
+
+  // A compact operator-facing catalogue of rows actually observed in the odds
+  // stream. It deliberately records no price history; immutable raw capture
+  // remains the audit source.
+  oddsTaxonomies: defineTable({
+    fixtureId: v.number(),
+    taxonomyKey: v.string(),
+    bookmaker: v.string(),
+    bookmakerId: v.number(),
+    superOddsType: v.string(),
+    marketPeriod: v.optional(v.string()),
+    lastInRunning: v.boolean(),
+    firstObservedAt: v.number(),
+    lastObservedAt: v.number(),
+    lastSourceEventId: v.string(),
+    sampleCount: v.number(),
+  }).index("by_fixtureId_and_taxonomyKey", ["fixtureId", "taxonomyKey"]),
+
+  // There is intentionally one manually-confirmed StablePrice row. Its
+  // fields are copied from an observed taxonomy, never supplied as a guessed
+  // bookmaker or market fallback.
+  oddsCanonicalRows: defineTable({
+    key: v.literal("stablePrice"),
+    taxonomyId: v.id("oddsTaxonomies"),
+    taxonomyKey: v.string(),
+    bookmaker: v.string(),
+    bookmakerId: v.number(),
+    superOddsType: v.string(),
+    marketPeriod: v.optional(v.string()),
+    confirmedAt: v.number(),
+  }).index("by_key", ["key"]),
 
   liveReactions: defineTable({
     fixtureId: v.number(),

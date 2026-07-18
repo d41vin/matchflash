@@ -5,6 +5,7 @@ import type { MatchRoomProjection } from "@/lib/match-room-projection"
 
 import { FixtureFeedNotice } from "./fixture-feed-notice"
 import { FieldVisualization } from "./field-visualization"
+import { OddsPresentation } from "./odds-presentation"
 
 export function MatchRoomView({ fixture }: { fixture: MatchRoomProjection }) {
   return (
@@ -55,6 +56,8 @@ export function MatchRoomView({ fixture }: { fixture: MatchRoomProjection }) {
           fixtureId={fixture.fixtureId}
           possession={fixture.field.possession}
         />
+
+        <OddsPresentation fixture={fixture} />
 
         {fixture.match.status === "live" ? (
           <LiveParticipationControls fixtureId={fixture.fixtureId} />

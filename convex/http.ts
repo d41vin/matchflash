@@ -3,8 +3,9 @@ import { httpRouter, type FunctionReference } from "convex/server"
 import { internal } from "./_generated/api"
 import { env, httpAction } from "./_generated/server"
 import type { RawCaptureArgs, TxlineSource } from "./ingestion"
+import type { Id } from "./_generated/dataModel"
 
-type IngestionApi = {
+type WorkerApi = {
   ingestion: {
     captureRawEvent: FunctionReference<
       "mutation",
@@ -19,11 +20,25 @@ type IngestionApi = {
       string | null
     >
   }
+  odds: {
+    listTaxonomy: FunctionReference<
+      "query",
+      "internal",
+      { fixtureId: number },
+      unknown
+    >
+    confirmStablePriceRow: FunctionReference<
+      "mutation",
+      "internal",
+      { taxonomyId: Id<"oddsTaxonomies"> },
+      null
+    >
+  }
 }
 
 // `internal` becomes fully typed when Convex code generation runs against the
 // configured deployment. Keep this local pre-deploy bridge typed meanwhile.
-const ingestion = internal as unknown as IngestionApi
+const workerApi = internal as unknown as WorkerApi
 
 function workerSecret(request: Request): Response | null {
   const expected = env.MATCHFLASH_WORKER_SECRET
@@ -59,7 +74,7 @@ http.route({
     }
 
     const result = await ctx.runMutation(
-      ingestion.ingestion.captureRawEvent,
+      workerApi.ingestion.captureRawEvent,
       payload
     )
     return Response.json(result)
@@ -81,12 +96,60 @@ http.route({
     }
 
     const lastEventId = await ctx.runQuery(
-      ingestion.ingestion.getResumeCheckpoint,
+      workerApi.ingestion.getResumeCheckpoint,
       {
         source,
       }
     )
     return Response.json({ lastEventId })
+  }),
+})
+
+// These endpoints are for the operator-owned worker environment only. They
+// make empirical taxonomy inspection and the deliberate confirmation step
+// executable without exposing either operation to browsers.
+http.route({
+  path: "/txline/odds/taxonomy",
+  method: "GET",
+  handler: httpAction(async (ctx, request) => {
+    const unauthorized = workerSecret(request)
+    if (unauthorized) return unauthorized
+
+    const fixtureId = Number(new URL(request.url).searchParams.get("fixtureId"))
+    if (!Number.isInteger(fixtureId)) {
+      return new Response("fixtureId must be an integer.", { status: 400 })
+    }
+    return Response.json(
+      await ctx.runQuery(workerApi.odds.listTaxonomy, { fixtureId })
+    )
+  }),
+})
+
+http.route({
+  path: "/txline/odds/confirm",
+  method: "POST",
+  handler: httpAction(async (ctx, request) => {
+    const unauthorized = workerSecret(request)
+    if (unauthorized) return unauthorized
+
+    let taxonomyId: string | undefined
+    try {
+      const body = (await request.json()) as { taxonomyId?: unknown }
+      taxonomyId =
+        typeof body.taxonomyId === "string" ? body.taxonomyId : undefined
+    } catch {
+      return new Response("Expected a JSON confirmation payload.", {
+        status: 400,
+      })
+    }
+    if (!taxonomyId) {
+      return new Response("taxonomyId is required.", { status: 400 })
+    }
+
+    await ctx.runMutation(workerApi.odds.confirmStablePriceRow, {
+      taxonomyId: taxonomyId as Id<"oddsTaxonomies">,
+    })
+    return new Response(null, { status: 204 })
   }),
 })
 

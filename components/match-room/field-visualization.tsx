@@ -4,7 +4,11 @@ import { useEffect, useRef, useState } from "react"
 import { useQuery } from "convex/react"
 
 import { api } from "@/convex/_generated/api"
-import { fieldReactionFor, type FieldReaction } from "@/lib/field-visualization"
+import {
+  fieldReactionFor,
+  type FieldReaction,
+  type PhaseOneFieldEvent,
+} from "@/lib/field-visualization"
 import type { MatchRoomProjection } from "@/lib/match-room-projection"
 
 const zoneClasses = {
@@ -13,6 +17,17 @@ const zoneClasses = {
   corner: "bottom-3 left-4",
   border: "inset-2",
 } as const
+
+function isFieldReactionType(type: string): type is PhaseOneFieldEvent["type"] {
+  return [
+    "goal",
+    "card",
+    "corner",
+    "varReview",
+    "varResolved",
+    "phaseChange",
+  ].includes(type)
+}
 
 export function FieldVisualization({
   fixtureId,
@@ -28,15 +43,26 @@ export function FieldVisualization({
   useEffect(() => {
     if (!timeline) return
 
+    const fieldEvents = timeline.filter(
+      (
+        event
+      ): event is typeof event & {
+        actionId: number
+        type: PhaseOneFieldEvent["type"]
+      } => typeof event.actionId === "number" && isFieldReactionType(event.type)
+    )
+
     if (seenActionIds.current === null) {
-      seenActionIds.current = new Set(timeline.map((event) => event.actionId))
+      seenActionIds.current = new Set(
+        fieldEvents.map((event) => event.actionId)
+      )
       return
     }
 
-    const nextEvent = [...timeline]
+    const nextEvent = [...fieldEvents]
       .reverse()
       .find((event) => !seenActionIds.current?.has(event.actionId))
-    for (const event of timeline) {
+    for (const event of fieldEvents) {
       seenActionIds.current.add(event.actionId)
     }
     if (!nextEvent) return

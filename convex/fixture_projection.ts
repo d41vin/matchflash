@@ -2,6 +2,7 @@ import { v } from "convex/values"
 
 import {
   projectMatchRoom,
+  type ConfirmedOddsRow,
   type FixtureRoomSource,
 } from "../lib/match-room-projection"
 import { query, type QueryCtx } from "./_generated/server"
@@ -12,8 +13,28 @@ function reader(ctx: QueryCtx): GenericDatabaseReader<MatchFlashDataModel> {
   return ctx.db as unknown as GenericDatabaseReader<MatchFlashDataModel>
 }
 
-function toProjection(source: FixtureRoomSource, now: number) {
-  return projectMatchRoom(source, now)
+function toProjection(
+  source: FixtureRoomSource,
+  now: number,
+  confirmedOddsRow?: ConfirmedOddsRow
+) {
+  return projectMatchRoom(source, now, confirmedOddsRow)
+}
+
+async function confirmedOddsRow(
+  db: GenericDatabaseReader<MatchFlashDataModel>
+) {
+  const row = await db
+    .query("oddsCanonicalRows")
+    .withIndex("by_key", (query) => query.eq("key", "stablePrice"))
+    .unique()
+  if (!row) return undefined
+  return {
+    bookmaker: row.bookmaker,
+    bookmakerId: row.bookmakerId,
+    superOddsType: row.superOddsType,
+    ...(row.marketPeriod ? { marketPeriod: row.marketPeriod } : {}),
+  }
 }
 
 export const list = query({
@@ -22,6 +43,7 @@ export const list = query({
     const db = reader(ctx)
     const states = await db.query("matchStates").order("desc").take(200)
     const now = args.now ?? Date.now()
+    const oddsRow = await confirmedOddsRow(db)
     const projections = []
 
     for (const state of states) {
@@ -34,7 +56,7 @@ export const list = query({
       if (!fixture) {
         continue
       }
-      projections.push(toProjection({ ...fixture, state }, now))
+      projections.push(toProjection({ ...fixture, state }, now, oddsRow))
     }
 
     return projections
@@ -62,6 +84,10 @@ export const get = query({
       return null
     }
 
-    return toProjection({ ...fixture, state }, args.now ?? Date.now())
+    return toProjection(
+      { ...fixture, state },
+      args.now ?? Date.now(),
+      await confirmedOddsRow(db)
+    )
   },
 })

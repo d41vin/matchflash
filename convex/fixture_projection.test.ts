@@ -14,6 +14,23 @@ const decayLiveHeat = makeFunctionReference<
   Record<string, never>,
   null
 >("heat:decayLiveHeat")
+const listOddsTaxonomy = makeFunctionReference<
+  "query",
+  { fixtureId: number },
+  Array<{
+    _id: string
+    fixtureId: number
+    bookmaker: string
+    bookmakerId: number
+    superOddsType: string
+    marketPeriod?: string
+  }>
+>("odds:listTaxonomy")
+const confirmStablePriceRow = makeFunctionReference<
+  "mutation",
+  { taxonomyId: string },
+  null
+>("odds:confirmStablePriceRow")
 
 test("stores a score adjustment once and exposes only its safe fixture projection", async () => {
   const t = convexTest(schema, modules)
@@ -82,6 +99,175 @@ test("stores a score adjustment once and exposes only its safe fixture projectio
     },
   })
   expect(projection).not.toHaveProperty("raw")
+})
+
+test("keeps odds unavailable until an observed StablePrice row is explicitly confirmed", async () => {
+  const t = convexTest(schema, modules)
+
+  await t.mutation(internal.ingestion.captureRawEvent, {
+    source: "scores",
+    sourceEventId: "score-1",
+    fixtureId: 42,
+    eventType: "standby",
+    raw: {
+      FixtureInfo: {
+        FixtureId: 42,
+        Competition: "World Cup 2026",
+        FixtureGroup: "World Cup > Final",
+        Participant1: "Northshore",
+        Participant2: "Southport",
+        StartTime: "2026-07-19T19:00:00.000Z",
+      },
+      Update: { Action: "standby", Id: 1, Seq: 1, StatusId: 4 },
+    },
+  })
+
+  const firstOdds = {
+    FixtureId: 42,
+    MessageId: "odds-1",
+    Ts: 1_000,
+    Bookmaker: "StablePrice Consensus",
+    BookmakerId: 7,
+    SuperOddsType: "MatchWinner",
+    MarketPeriod: "FullTime",
+    InRunning: true,
+    PriceNames: ["Home", "Draw", "Away"],
+    Prices: [1.8, 3.5, 4.4],
+    Pct: ["52.000", "26.000", "22.000"],
+  }
+  await t.mutation(internal.ingestion.captureRawEvent, {
+    source: "odds",
+    sourceEventId: "odds-1",
+    fixtureId: 42,
+    eventType: "odds",
+    raw: firstOdds,
+  })
+
+  expect(
+    await t.query(api.fixture_projection.get, { fixtureId: 42, now: 1_000 })
+  ).toMatchObject({ odds: { availability: "unavailable" } })
+
+  const taxonomy = await t.query(listOddsTaxonomy, { fixtureId: 42 })
+  expect(taxonomy).toHaveLength(1)
+  expect(taxonomy[0]).toMatchObject({
+    fixtureId: 42,
+    bookmaker: "StablePrice Consensus",
+    bookmakerId: 7,
+    superOddsType: "MatchWinner",
+    marketPeriod: "FullTime",
+  })
+
+  await t.mutation(confirmStablePriceRow, { taxonomyId: taxonomy[0]._id })
+  await t.mutation(internal.ingestion.captureRawEvent, {
+    source: "odds",
+    sourceEventId: "odds-2",
+    fixtureId: 42,
+    eventType: "odds",
+    raw: {
+      ...firstOdds,
+      MessageId: "odds-2",
+      Ts: 2_000,
+      Pct: ["64.000", "20.000", "16.000"],
+    },
+  })
+  await t.mutation(internal.ingestion.captureRawEvent, {
+    source: "odds",
+    sourceEventId: "odds-3",
+    fixtureId: 42,
+    eventType: "odds",
+    raw: {
+      ...firstOdds,
+      MessageId: "odds-3",
+      Ts: 3_000,
+      Pct: ["52.000", "26.000", "22.000"],
+    },
+  })
+
+  expect(
+    await t.query(api.fixture_projection.get, { fixtureId: 42, now: 3_000 })
+  ).toMatchObject({
+    odds: {
+      availability: "available",
+      home: 52,
+      draw: 26,
+      away: 22,
+      provenance: {
+        bookmaker: "StablePrice Consensus",
+        bookmakerId: 7,
+        superOddsType: "MatchWinner",
+        marketPeriod: "FullTime",
+        asOfTs: 3_000,
+      },
+    },
+  })
+
+  expect(
+    await t.query(api.fixture_timeline.list, { fixtureId: 42 })
+  ).toMatchObject([
+    {
+      actionId: "odds:odds-3",
+      type: "oddsSwing",
+      title: "Northshore win probability fell from 64% to 52%.",
+      probBefore: 64,
+      probAfter: 52,
+      impactScore: 30,
+    },
+  ])
+
+  expect(
+    (await t.query(api.fixture_projection.get, { fixtureId: 42, now: 3_000 }))
+      ?.heat.value
+  ).toBeGreaterThan(8.9)
+
+  await t.mutation(internal.ingestion.captureRawEvent, {
+    source: "odds",
+    sourceEventId: "other-odds-1",
+    fixtureId: 42,
+    eventType: "odds",
+    raw: {
+      ...firstOdds,
+      MessageId: "other-odds-1",
+      Bookmaker: "Other Bookmaker",
+      BookmakerId: 8,
+    },
+  })
+  const replacementTaxonomy = (
+    await t.query(listOddsTaxonomy, {
+      fixtureId: 42,
+    })
+  ).find((row) => row.bookmaker === "Other Bookmaker")
+  expect(replacementTaxonomy).toBeDefined()
+  await t.mutation(confirmStablePriceRow, {
+    taxonomyId: replacementTaxonomy!._id,
+  })
+
+  expect(
+    await t.query(api.fixture_projection.get, { fixtureId: 42, now: 3_000 })
+  ).toMatchObject({ odds: { availability: "unavailable" } })
+  expect(await t.query(api.fixture_timeline.list, { fixtureId: 42 })).toEqual(
+    []
+  )
+
+  await t.mutation(internal.ingestion.captureRawEvent, {
+    source: "odds",
+    sourceEventId: "other-odds-2",
+    fixtureId: 42,
+    eventType: "odds",
+    raw: {
+      ...firstOdds,
+      MessageId: "other-odds-2",
+      Ts: 4_000,
+      Bookmaker: "Other Bookmaker",
+      BookmakerId: 8,
+      Pct: ["70.000", "18.000", "12.000"],
+    },
+  })
+  expect(
+    await t.query(api.fixture_projection.get, { fixtureId: 42, now: 4_000 })
+  ).toMatchObject({ odds: { availability: "available", home: 70 } })
+  expect(await t.query(api.fixture_timeline.list, { fixtureId: 42 })).toEqual(
+    []
+  )
 })
 
 test("projects stored Heat and possession intensity without exposing source payloads", async () => {

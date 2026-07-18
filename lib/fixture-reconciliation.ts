@@ -32,6 +32,16 @@ export type ReconciledMatchState = {
     intensity: "safe" | "attack" | "danger" | "highDanger"
     since: number
   }
+  winProb1?: number
+  drawProb?: number
+  winProb2?: number
+  oddsProvenance?: {
+    bookmaker: string
+    bookmakerId: number
+    superOddsType: string
+    marketPeriod?: string
+    asOfTs: number
+  }
   updatedAt: number
 }
 

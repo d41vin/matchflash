@@ -11,10 +11,10 @@ import {
   discardedActionId,
 } from "../lib/flash-classification"
 import {
-  applyFlashContribution,
   applyPossessionContribution,
   shouldApplyPossessionContribution,
 } from "../lib/heat"
+import { applyFlashHeat } from "./heat"
 import type { MatchFlashDataModel } from "./schema"
 import type { Id } from "./_generated/dataModel"
 
@@ -166,29 +166,6 @@ export async function reconcileCapturedScoreEvent(
   )
   await updateFlashTimeline(db, raw, reconciled, capturedAt)
   await updatePossessionHeat(db, reconciled, capturedAt)
-}
-
-async function applyFlashHeat(
-  db: ReconciliationDatabase,
-  fixtureId: number,
-  impactScore: number,
-  capturedAt: number
-) {
-  const state = await db
-    .query("matchStates")
-    .withIndex("by_fixtureId", (query) => query.eq("fixtureId", fixtureId))
-    .unique()
-  if (!state) return
-
-  const heat = applyFlashContribution(
-    {
-      heat: state.heat ?? 0,
-      heatUpdatedAt: state.heatUpdatedAt ?? capturedAt,
-    },
-    impactScore,
-    capturedAt
-  )
-  await db.patch(state._id, heat)
 }
 
 async function updatePossessionHeat(

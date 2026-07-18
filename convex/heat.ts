@@ -1,6 +1,6 @@
 import type { GenericDatabaseWriter } from "convex/server"
 
-import { decayedHeat } from "../lib/heat"
+import { applyFlashContribution, decayedHeat } from "../lib/heat"
 import { internalMutation, type MutationCtx } from "./_generated/server"
 import type { MatchFlashDataModel } from "./schema"
 
@@ -8,6 +8,30 @@ function database(
   ctx: MutationCtx
 ): GenericDatabaseWriter<MatchFlashDataModel> {
   return ctx.db as unknown as GenericDatabaseWriter<MatchFlashDataModel>
+}
+
+/** Applies the shared Heat contribution whenever a confirmed Flash Card exists. */
+export async function applyFlashHeat(
+  db: GenericDatabaseWriter<MatchFlashDataModel>,
+  fixtureId: number,
+  impactScore: number,
+  capturedAt: number
+) {
+  const state = await db
+    .query("matchStates")
+    .withIndex("by_fixtureId", (query) => query.eq("fixtureId", fixtureId))
+    .unique()
+  if (!state) return
+
+  const heat = applyFlashContribution(
+    {
+      heat: state.heat ?? 0,
+      heatUpdatedAt: state.heatUpdatedAt ?? capturedAt,
+    },
+    impactScore,
+    capturedAt
+  )
+  await db.patch(state._id, heat)
 }
 
 /** Persists quiet-match Heat decay; public queries only ever read it. */
