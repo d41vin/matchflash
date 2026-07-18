@@ -15,6 +15,11 @@ import {
   shouldApplyPossessionContribution,
 } from "../lib/heat"
 import { applyFlashHeat } from "./heat"
+import {
+  applyPredictionEvent,
+  queueManualReviewsForAction,
+  voidPredictionsForAction,
+} from "./predictions"
 import { ensureGlobalRoom } from "./rooms"
 import type { MatchFlashDataModel } from "./schema"
 import type { Id } from "./_generated/dataModel"
@@ -227,6 +232,15 @@ async function updateFlashTimeline(
   reconciled: ReconciledFixture,
   capturedAt: number
 ) {
+  // An action_invalid comment identifies a late, ambiguous correction. It
+  // reaches the prediction workflow even though it never becomes fan-facing.
+  await applyPredictionEvent(
+    db,
+    reconciled.state.fixtureId,
+    raw,
+    undefined,
+    capturedAt
+  )
   // A correction is allowed to change its targeted action only when it is at
   // least as recent as the correction already reconciled for that action.
   // This prevents a late replayed discard from retracting newer state.
@@ -260,6 +274,12 @@ async function updateFlashTimeline(
     if (existing && !existing.retracted) {
       await db.patch(existing._id, { retracted: true, updatedAt: capturedAt })
     }
+    await voidPredictionsForAction(
+      db,
+      reconciled.state.fixtureId,
+      discardedId,
+      capturedAt
+    )
     return
   }
 
@@ -294,6 +314,12 @@ async function updateFlashTimeline(
     if (existing && !existing.retracted) {
       await db.patch(existing._id, { retracted: true, updatedAt: capturedAt })
     }
+    await voidPredictionsForAction(
+      db,
+      reconciled.state.fixtureId,
+      amendedId,
+      capturedAt
+    )
     return
   }
 
@@ -306,16 +332,46 @@ async function updateFlashTimeline(
     )
     .unique()
   if (existing) {
+    const amendedId = amendedActionId(raw)
+    const changesSettlementFact =
+      amendedId !== null &&
+      (existing.title !== classified.title ||
+        existing.participant !== classified.participant)
+    if (changesSettlementFact) {
+      await voidPredictionsForAction(
+        db,
+        reconciled.state.fixtureId,
+        amendedId,
+        capturedAt
+      )
+    } else if (amendedId !== null) {
+      await queueManualReviewsForAction(
+        db,
+        reconciled.state.fixtureId,
+        amendedId,
+        capturedAt
+      )
+    }
     await db.patch(existing._id, {
       type: classified.type,
       title: classified.title,
+      ...(classified.participant !== undefined
+        ? { participant: classified.participant }
+        : {}),
       retracted: false,
       updatedAt: capturedAt,
     })
+    await applyPredictionEvent(
+      db,
+      reconciled.state.fixtureId,
+      raw,
+      existing._id,
+      capturedAt
+    )
     return
   }
 
-  await db.insert("flashCards", {
+  const flashCardId = await db.insert("flashCards", {
     ...classified,
     confirmed: true,
     retracted: false,
@@ -326,6 +382,13 @@ async function updateFlashTimeline(
     db,
     classified.fixtureId,
     classified.impactScore,
+    capturedAt
+  )
+  await applyPredictionEvent(
+    db,
+    reconciled.state.fixtureId,
+    raw,
+    flashCardId,
     capturedAt
   )
 }

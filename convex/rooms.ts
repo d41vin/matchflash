@@ -40,7 +40,7 @@ function profileForWallet(walletAddress: string) {
   }
 }
 
-async function currentUser(ctx: MutationCtx) {
+export async function currentUser(ctx: MutationCtx) {
   const identity = await ctx.auth.getUserIdentity()
   if (!identity) throw new Error("Sign in to join a Room.")
 
@@ -102,7 +102,7 @@ async function requirePrivateRoomMembership(
     throw new Error("Join this private Room to view its standings.")
 }
 
-async function requireActiveRoom(
+export async function requireActiveRoom(
   db: GenericDatabaseWriter<MatchFlashDataModel>,
   roomId: Id<"rooms">
 ) {

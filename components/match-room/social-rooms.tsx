@@ -63,6 +63,31 @@ const recordReaction = makeFunctionReference<
   },
   { reactionId: Id<"roomReactions"> }
 >("rooms:recordReaction")
+const predictionPrompts = makeFunctionReference<
+  "query",
+  { fixtureId: number },
+  Array<{
+    _id: Id<"predictionPrompts">
+    question: string
+    options: Array<{ id: string; label: string }>
+    status: "open" | "locked" | "settled" | "voided"
+    locksAt: number
+  }>
+>("predictions:list")
+const answerPrediction = makeFunctionReference<
+  "mutation",
+  {
+    promptId: Id<"predictionPrompts">
+    roomId: Id<"rooms">
+    optionId: string
+  },
+  { predictionId: Id<"predictions"> }
+>("predictions:answer")
+const predictionDataQualityNotes = makeFunctionReference<
+  "query",
+  { fixtureId: number },
+  Array<{ _id: Id<"predictionCorrectionNotes">; message: string }>
+>("predictions:dataQualityNotes")
 
 export function SocialRooms({ fixtureId }: { fixtureId: number }) {
   const { isAuthenticated, isLoading, requestSignIn } = useMatchFlashAuth()
@@ -79,15 +104,24 @@ export function SocialRooms({ fixtureId }: { fixtureId: number }) {
     selectedRoomId ? { roomId: selectedRoomId } : "skip"
   )
   const flashCards = useQuery(fixtureTimeline, { fixtureId })
+  const prompts = useQuery(predictionPrompts, { fixtureId })
+  const dataQualityNotes = useQuery(predictionDataQualityNotes, { fixtureId })
   const create = useMutation(createRoom)
   const join = useMutation(joinRoom)
   const react = useMutation(recordReaction)
+  const answer = useMutation(answerPrediction)
   const [name, setName] = useState("")
   const [kind, setKind] = useState<"public" | "private">("public")
   const [status, setStatus] = useState<string | null>(null)
   const [isSaving, setIsSaving] = useState(false)
   const frozen = rooms?.some((room) => room.frozen) ?? false
   const publicRooms = rooms?.filter((room) => room.kind === "public") ?? []
+  const predictionRoomId =
+    selectedRoomId ?? rooms?.find((room) => room.kind === "global")?._id ?? null
+  const activePrompts =
+    prompts?.filter(
+      (prompt) => prompt.status === "open" || prompt.status === "locked"
+    ) ?? []
 
   async function requireAuth() {
     if (isAuthenticated) return true
@@ -146,6 +180,25 @@ export function SocialRooms({ fixtureId }: { fixtureId: number }) {
         cause instanceof Error
           ? cause.message
           : "Could not record that reaction."
+      )
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  async function answerPrompt(
+    promptId: Id<"predictionPrompts">,
+    optionId: string
+  ) {
+    if (!predictionRoomId || !(await requireAuth())) return
+    setIsSaving(true)
+    setStatus(null)
+    try {
+      await answer({ promptId, roomId: predictionRoomId, optionId })
+      setStatus("Prediction recorded for this Room's standings.")
+    } catch (cause) {
+      setStatus(
+        cause instanceof Error ? cause.message : "Could not record prediction."
       )
     } finally {
       setIsSaving(false)
@@ -228,6 +281,53 @@ export function SocialRooms({ fixtureId }: { fixtureId: number }) {
           )}
         </div>
       </div>
+
+      {!frozen && activePrompts.length ? (
+        <div className="mt-5 rounded-2xl border border-cyan-200/20 bg-slate-950/65 p-4">
+          <p className="text-xs font-semibold tracking-[0.16em] text-cyan-200">
+            CANONICAL PREDICTIONS
+          </p>
+          <div className="mt-3 space-y-4">
+            {activePrompts.map((prompt) => (
+              <div key={prompt._id}>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <h3 className="font-semibold text-white">
+                    {prompt.question}
+                  </h3>
+                  <span className="text-xs text-slate-400">
+                    {prompt.status === "locked" ? "Locked" : "Locks shortly"}
+                  </span>
+                </div>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {prompt.options.map((option) => (
+                    <button
+                      className="rounded-full border border-cyan-200/30 px-3 py-1.5 text-sm font-semibold text-cyan-100 disabled:opacity-50"
+                      disabled={
+                        !predictionRoomId ||
+                        prompt.status !== "open" ||
+                        isLoading ||
+                        isSaving
+                      }
+                      key={option.id}
+                      onClick={() => void answerPrompt(prompt._id, option.id)}
+                      type="button"
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
+
+      {dataQualityNotes?.length ? (
+        <div className="mt-5 rounded-2xl border border-amber-200/25 bg-amber-200/5 p-4 text-sm text-amber-50">
+          <p className="font-semibold">Prediction data quality</p>
+          <p className="mt-1 leading-6">{dataQualityNotes.at(-1)?.message}</p>
+        </div>
+      ) : null}
 
       {memberRooms?.length ? (
         <div className="mt-5 rounded-2xl bg-slate-950/65 p-4">

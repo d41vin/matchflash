@@ -1,7 +1,14 @@
 import type { ReliabilityState } from "./fixture-reconciliation"
 
 export type CoreFlashType =
-  "goal" | "card" | "corner" | "varReview" | "varResolved" | "phaseChange"
+  | "goal"
+  | "card"
+  | "corner"
+  | "varReview"
+  | "varResolved"
+  | "phaseChange"
+  | "penaltyAwarded"
+  | "penaltyResolved"
 
 export type CoreFlashCard = {
   fixtureId: number
@@ -12,7 +19,7 @@ export type CoreFlashCard = {
   participant?: 1 | 2
 }
 
-const FINAL_STATUS_IDS = [5, 10, 13, 15, 16, 17]
+export const FINAL_STATUS_IDS = [5, 10, 13, 15, 16, 17]
 
 type JsonObject = Record<string, unknown>
 
@@ -42,15 +49,19 @@ function participantAt(value: unknown): 1 | 2 | undefined {
   return participant === 1 || participant === 2 ? participant : undefined
 }
 
-type SourceAction = {
+export type SourceAction = {
   action: string
   actionId: number
   confirmed: boolean
   statusId?: number
   participant?: 1 | 2
+  outcome?: string
+  followsActionId?: number
+  amended: boolean
+  manualCorrection: boolean
 }
 
-function sourceAction(raw: unknown): SourceAction | null {
+export function sourceAction(raw: unknown): SourceAction | null {
   if (!isObject(raw)) return null
 
   const update = objectAt(raw, "Update")
@@ -75,7 +86,14 @@ function sourceAction(raw: unknown): SourceAction | null {
       // action payload and does not repeat the original Confirmed field.
       confirmed: true,
       statusId: numberAt(replacement.StatusId),
-      participant: participantAt(data?.Participant),
+      participant:
+        participantAt(replacement.Participant) ??
+        participantAt(data?.Participant),
+      outcome: stringAt(replacement.Outcome),
+      followsActionId:
+        numberAt(update.FollowsAction) ?? numberAt(data?.FollowsAction),
+      amended: true,
+      manualCorrection: false,
     }
   }
 
@@ -88,7 +106,17 @@ function sourceAction(raw: unknown): SourceAction | null {
     confirmed: booleanAt(update.Confirmed) === true,
     statusId: numberAt(update.StatusId) ?? numberAt(data?.StatusId),
     participant: participantAt(update.Participant),
+    outcome: stringAt(data?.Outcome),
+    followsActionId:
+      numberAt(update.FollowsAction) ?? numberAt(data?.FollowsAction),
+    amended: false,
+    manualCorrection:
+      action === "comment" && stringAt(data?.Severity) === "action_invalid",
   }
+}
+
+export function isFinalStatus(statusId: number | undefined) {
+  return FINAL_STATUS_IDS.includes(statusId ?? -1)
 }
 
 function canCreateCard(type: CoreFlashType, reliability: ReliabilityState) {
@@ -111,7 +139,7 @@ function canCreateCard(type: CoreFlashType, reliability: ReliabilityState) {
 function phaseTitle(action: string, statusId: number | undefined) {
   if (action === "kickoff") return "Kickoff"
   if (action === "halftime_finalised") return "Half time"
-  if (FINAL_STATUS_IDS.includes(statusId ?? -1)) {
+  if (isFinalStatus(statusId)) {
     return "Full time"
   }
   return null
@@ -150,11 +178,28 @@ export function classifyCoreFlashCard(
     type = "varResolved"
     title = "VAR decision"
     impactScore = 15
+  } else if (source.action === "goal") {
+    type = "goal"
+    title = "Goal"
+    impactScore = 60
+  } else if (source.action === "penalty") {
+    type = "penaltyAwarded"
+    title = "Penalty awarded"
+    impactScore = 20
+  } else if (source.action === "penalty_outcome" && source.outcome) {
+    type = "penaltyResolved"
+    title =
+      source.outcome === "Scored"
+        ? "Penalty scored"
+        : source.outcome === "Missed"
+          ? "Penalty missed"
+          : "Penalty retake"
+    impactScore =
+      source.outcome === "Scored" ? 55 : source.outcome === "Missed" ? 30 : 15
   } else if (
     source.action === "kickoff" ||
     source.action === "halftime_finalised" ||
-    (source.action === "status" &&
-      FINAL_STATUS_IDS.includes(source.statusId ?? -1))
+    (source.action === "status" && isFinalStatus(source.statusId))
   ) {
     type = "phaseChange"
     title = phaseTitle(source.action, source.statusId)

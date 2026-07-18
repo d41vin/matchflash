@@ -32,7 +32,13 @@ test("projects confirmed core actions as fixture-level Flash Cards", async () =>
       eventType: action,
       raw: {
         FixtureInfo: fixtureInfo,
-        Update: { Action: action, Id: id, Seq: id, Confirmed: true, StatusId: 4 },
+        Update: {
+          Action: action,
+          Id: id,
+          Seq: id,
+          Confirmed: true,
+          StatusId: 4,
+        },
       },
     })
   }
@@ -40,11 +46,15 @@ test("projects confirmed core actions as fixture-level Flash Cards", async () =>
   expect(await t.query(api.fixture_timeline.list, { fixtureId: 42 })).toEqual([
     expect.objectContaining({ actionId: 1, type: "card", retracted: false }),
     expect.objectContaining({ actionId: 2, type: "corner", retracted: false }),
-    expect.objectContaining({ actionId: 3, type: "phaseChange", retracted: false }),
+    expect.objectContaining({
+      actionId: 3,
+      type: "phaseChange",
+      retracted: false,
+    }),
   ])
 })
 
-test("keeps possible, unconfirmed, ordinary, and empirically gated actions out of the permanent timeline", async () => {
+test("keeps possible, unconfirmed, ordinary, and ambient actions out of the permanent timeline", async () => {
   const t = convexTest(schema, modules)
 
   for (const [sourceEventId, action, id, confirmed] of [
@@ -52,8 +62,6 @@ test("keeps possible, unconfirmed, ordinary, and empirically gated actions out o
     ["unconfirmed-goal-2", "goal", 2, false],
     ["ordinary-shot-3", "shot", 3, true],
     ["possession-4", "high_danger_possession", 4, true],
-    // Goal classification stays disabled until the observed penalty/goal
-    // sequence establishes the safe deduplication rule.
     ["goal-5", "goal", 5, true],
   ] as const) {
     await t.mutation(internal.ingestion.captureRawEvent, {
@@ -63,12 +71,20 @@ test("keeps possible, unconfirmed, ordinary, and empirically gated actions out o
       eventType: action,
       raw: {
         FixtureInfo: fixtureInfo,
-        Update: { Action: action, Id: id, Seq: id, Confirmed: confirmed, StatusId: 4 },
+        Update: {
+          Action: action,
+          Id: id,
+          Seq: id,
+          Confirmed: confirmed,
+          StatusId: 4,
+        },
       },
     })
   }
 
-  expect(await t.query(api.fixture_timeline.list, { fixtureId: 42 })).toEqual([])
+  expect(await t.query(api.fixture_timeline.list, { fixtureId: 42 })).toEqual([
+    expect.objectContaining({ actionId: 5, type: "goal", retracted: false }),
+  ])
 })
 
 test("applies a confirmed source amendment to its existing Flash Card", async () => {
@@ -110,14 +126,16 @@ test("applies a confirmed source amendment to its existing Flash Card", async ()
       },
     })
 
-    expect(await t.query(api.fixture_timeline.list, { fixtureId: 42 })).toEqual([
-      expect.objectContaining({
-        actionId: 1,
-        type: "card",
-        retracted: false,
-        updatedAt: 2_000,
-      }),
-    ])
+    expect(await t.query(api.fixture_timeline.list, { fixtureId: 42 })).toEqual(
+      [
+        expect.objectContaining({
+          actionId: 1,
+          type: "card",
+          retracted: false,
+          updatedAt: 2_000,
+        }),
+      ]
+    )
   } finally {
     vi.useRealTimers()
   }
@@ -153,7 +171,9 @@ test("retracts a Flash Card when a source amendment declassifies it", async () =
     },
   })
 
-  expect(await t.query(api.fixture_timeline.list, { fixtureId: 42 })).toEqual([])
+  expect(await t.query(api.fixture_timeline.list, { fixtureId: 42 })).toEqual(
+    []
+  )
 })
 
 test("retracts a discarded Flash Card and gates cards while the source is unreliable", async () => {
@@ -208,11 +228,19 @@ test("retracts a discarded Flash Card and gates cards while the source is unreli
     eventType: "red_card",
     raw: {
       FixtureInfo: fixtureInfo,
-      Update: { Action: "red_card", Id: 4, Seq: 4, Confirmed: true, StatusId: 4 },
+      Update: {
+        Action: "red_card",
+        Id: 4,
+        Seq: 4,
+        Confirmed: true,
+        StatusId: 4,
+      },
     },
   })
 
-  expect(await t.query(api.fixture_timeline.list, { fixtureId: 42 })).toEqual([])
+  expect(await t.query(api.fixture_timeline.list, { fixtureId: 42 })).toEqual(
+    []
+  )
 })
 
 test("ignores a stale discard after a newer action is reconciled", async () => {

@@ -126,7 +126,9 @@ export const schema = defineSchema({
       v.literal("oddsSwing"),
       v.literal("varReview"),
       v.literal("varResolved"),
-      v.literal("phaseChange")
+      v.literal("phaseChange"),
+      v.literal("penaltyAwarded"),
+      v.literal("penaltyResolved")
     ),
     title: v.string(),
     participant: v.optional(v.union(v.literal(1), v.literal(2))),
@@ -256,6 +258,75 @@ export const schema = defineSchema({
   })
     .index("by_roomId_and_flashCardId", ["roomId", "flashCardId"])
     .index("by_fixtureId_and_createdAt", ["fixtureId", "createdAt"]),
+
+  // Prompts are fixture-level and canonical. A prediction stores the Room
+  // only as the social context for standings, never as prompt scope.
+  predictionPrompts: defineTable({
+    fixtureId: v.number(),
+    flashCardId: v.id("flashCards"),
+    sourceActionId: v.number(),
+    template: v.union(v.literal("nextGoal"), v.literal("penaltyOutcome")),
+    ruleKey: v.union(
+      v.literal("nextGoal.confirmedGoalOrFullTime.v1"),
+      v.literal("penaltyOutcome.confirmedOutcome.v1")
+    ),
+    lockRuleKey: v.literal("fixedWindow.v1"),
+    voidRuleKey: v.literal("voidOnAffectingCorrection.v1"),
+    question: v.string(),
+    options: v.array(v.object({ id: v.string(), label: v.string() })),
+    opensAt: v.number(),
+    locksAt: v.number(),
+    settlementRule: v.string(),
+    settlementMethod: v.literal("pipeline"),
+    status: v.union(
+      v.literal("open"),
+      v.literal("locked"),
+      v.literal("settled"),
+      v.literal("voided")
+    ),
+    winningOption: v.optional(v.string()),
+    settledByActionId: v.optional(v.number()),
+    settledAt: v.optional(v.number()),
+  })
+    .index("by_fixtureId", ["fixtureId"])
+    .index("by_flashCardId", ["flashCardId"])
+    .index("by_fixtureId_and_template_and_status", [
+      "fixtureId",
+      "template",
+      "status",
+    ]),
+
+  predictions: defineTable({
+    promptId: v.id("predictionPrompts"),
+    roomId: v.id("rooms"),
+    userId: v.id("users"),
+    optionId: v.string(),
+    createdAt: v.number(),
+    result: v.optional(
+      v.union(v.literal("win"), v.literal("loss"), v.literal("void"))
+    ),
+    pointsAwarded: v.optional(v.number()),
+  })
+    .index("by_promptId", ["promptId"])
+    .index("by_promptId_and_userId", ["promptId", "userId"]),
+
+  predictionCorrectionNotes: defineTable({
+    fixtureId: v.number(),
+    promptId: v.id("predictionPrompts"),
+    message: v.string(),
+    createdAt: v.number(),
+  })
+    .index("by_promptId", ["promptId"])
+    .index("by_fixtureId", ["fixtureId"]),
+
+  predictionCorrectionReviews: defineTable({
+    fixtureId: v.number(),
+    promptId: v.id("predictionPrompts"),
+    sourceActionId: v.optional(v.number()),
+    reason: v.string(),
+    createdAt: v.number(),
+    status: v.literal("pending"),
+  }).index("by_fixtureId_and_status", ["fixtureId", "status"]),
 
   liveReactions: defineTable({
     fixtureId: v.number(),
