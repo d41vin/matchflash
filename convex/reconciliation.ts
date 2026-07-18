@@ -5,6 +5,11 @@ import {
   type FixtureAction,
   type ReconciledFixture,
 } from "../lib/fixture-reconciliation"
+import {
+  amendedActionId,
+  classifyCoreFlashCard,
+  discardedActionId,
+} from "../lib/flash-classification"
 import type { MatchFlashDataModel } from "./schema"
 import type { Id } from "./_generated/dataModel"
 
@@ -154,6 +159,110 @@ export async function reconcileCapturedScoreEvent(
     raw,
     capturedAt
   )
+  await updateFlashTimeline(db, raw, reconciled, capturedAt)
+}
+
+async function updateFlashTimeline(
+  db: ReconciliationDatabase,
+  raw: unknown,
+  reconciled: ReconciledFixture,
+  capturedAt: number
+) {
+  // A correction is allowed to change its targeted action only when it is at
+  // least as recent as the correction already reconciled for that action.
+  // This prevents a late replayed discard from retracting newer state.
+  if (reconciled.action?.sequence !== undefined) {
+    const existingAction = await db
+      .query("fixtureActions")
+      .withIndex("by_fixtureId_and_actionId", (query) =>
+        query
+          .eq("fixtureId", reconciled.action!.fixtureId)
+          .eq("actionId", reconciled.action!.actionId)
+      )
+      .unique()
+    if (
+      existingAction?.sequence !== undefined &&
+      reconciled.action.sequence < existingAction.sequence
+    ) {
+      return
+    }
+  }
+
+  const discardedId = discardedActionId(raw)
+  if (discardedId !== null) {
+    const existing = await db
+      .query("flashCards")
+      .withIndex("by_fixtureId_and_actionId", (query) =>
+        query
+          .eq("fixtureId", reconciled.state.fixtureId)
+          .eq("actionId", discardedId)
+      )
+      .unique()
+    if (existing && !existing.retracted) {
+      await db.patch(existing._id, { retracted: true, updatedAt: capturedAt })
+    }
+    return
+  }
+
+  const classified = classifyCoreFlashCard(
+    reconciled.state.fixtureId,
+    raw,
+    reconciled.state.reliability
+  )
+  if (!classified) {
+    const amendedId = amendedActionId(raw)
+    if (amendedId === null) return
+
+    // Reliability gates prevent new cards but do not erase a previously
+    // confirmed record. A real source declassification, however, retracts
+    // the affected card from the public timeline.
+    const remainsCore = classifyCoreFlashCard(
+      reconciled.state.fixtureId,
+      raw,
+      reconciled.state.reliability,
+      true
+    )
+    if (remainsCore) return
+
+    const existing = await db
+      .query("flashCards")
+      .withIndex("by_fixtureId_and_actionId", (query) =>
+        query
+          .eq("fixtureId", reconciled.state.fixtureId)
+          .eq("actionId", amendedId)
+      )
+      .unique()
+    if (existing && !existing.retracted) {
+      await db.patch(existing._id, { retracted: true, updatedAt: capturedAt })
+    }
+    return
+  }
+
+  const existing = await db
+    .query("flashCards")
+    .withIndex("by_fixtureId_and_actionId", (query) =>
+      query
+        .eq("fixtureId", classified.fixtureId)
+        .eq("actionId", classified.actionId)
+    )
+    .unique()
+  if (existing) {
+    await db.patch(existing._id, {
+      type: classified.type,
+      title: classified.title,
+      retracted: false,
+      updatedAt: capturedAt,
+    })
+    return
+  }
+
+  await db.insert("flashCards", {
+    ...classified,
+    confirmed: true,
+    retracted: false,
+    createdAt: capturedAt,
+    updatedAt: capturedAt,
+  })
 }
 
 async function persistReconciledFixture(

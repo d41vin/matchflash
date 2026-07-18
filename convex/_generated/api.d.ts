@@ -10,6 +10,7 @@
 
 import type * as fixture_phase from "../fixture_phase.js";
 import type * as fixture_projection from "../fixture_projection.js";
+import type * as fixture_timeline from "../fixture_timeline.js";
 import type * as http from "../http.js";
 import type * as ingestion from "../ingestion.js";
 import type * as participation from "../participation.js";
@@ -25,6 +26,7 @@ import type {
 declare const fullApi: ApiFromModules<{
   fixture_phase: typeof fixture_phase;
   fixture_projection: typeof fixture_projection;
+  fixture_timeline: typeof fixture_timeline;
   http: typeof http;
   ingestion: typeof ingestion;
   participation: typeof participation;

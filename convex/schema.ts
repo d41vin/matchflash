@@ -78,6 +78,28 @@ export const schema = defineSchema({
     updatedAt: v.number(),
   }).index("by_fixtureId_and_actionId", ["fixtureId", "actionId"]),
 
+  // The permanent, fixture-level record derived from reconciled score events.
+  // It contains only the classification a Match Room may render, never a
+  // provider payload. Corrections retain the record for audit but retract it
+  // from the public timeline.
+  flashCards: defineTable({
+    fixtureId: v.number(),
+    actionId: v.number(),
+    type: v.union(
+      v.literal("goal"),
+      v.literal("card"),
+      v.literal("corner"),
+      v.literal("phaseChange")
+    ),
+    title: v.string(),
+    confirmed: v.literal(true),
+    retracted: v.boolean(),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_fixtureId_and_actionId", ["fixtureId", "actionId"])
+    .index("by_fixtureId_and_retracted", ["fixtureId", "retracted"]),
+
   // This is the immutable capture boundary between TxLINE and every later
   // projection. Some administrative source messages do not name a fixture,
   // but are retained so a stream session can be audited faithfully.
