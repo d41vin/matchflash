@@ -6,6 +6,7 @@ import type { MatchRoomProjection } from "@/lib/match-room-projection"
 import { FixtureFeedNotice } from "./fixture-feed-notice"
 import { FieldVisualization } from "./field-visualization"
 import { OddsPresentation } from "./odds-presentation"
+import { ReplayMatchRoom } from "./replay-match-room"
 
 export function MatchRoomView({ fixture }: { fixture: MatchRoomProjection }) {
   return (
@@ -50,34 +51,40 @@ export function MatchRoomView({ fixture }: { fixture: MatchRoomProjection }) {
           </p>
         </section>
 
-        <FixtureFeedNotice fixture={fixture} />
+        {fixture.match.status === "final" ? (
+          <ReplayMatchRoom fixture={fixture} />
+        ) : (
+          <>
+            <FixtureFeedNotice fixture={fixture} />
 
-        <FieldVisualization
-          fixtureId={fixture.fixtureId}
-          possession={fixture.field.possession}
-        />
+            <FieldVisualization
+              fixtureId={fixture.fixtureId}
+              possession={fixture.field.possession}
+            />
 
-        <OddsPresentation fixture={fixture} />
+            <OddsPresentation fixture={fixture} />
 
-        {fixture.match.status === "live" ? (
-          <LiveParticipationControls fixtureId={fixture.fixtureId} />
-        ) : null}
+            {fixture.match.status === "live" ? (
+              <LiveParticipationControls fixtureId={fixture.fixtureId} />
+            ) : null}
 
-        <section className="mt-5 rounded-3xl border border-dashed border-slate-700 bg-slate-900/60 p-6 sm:p-8">
-          <p className="text-xs font-semibold tracking-[0.16em] text-cyan-200">
-            MATCH SIGNALS
-          </p>
-          <h2 className="mt-3 text-xl font-bold text-white">
-            Following this fixture together
-          </h2>
-          <p className="mt-2 max-w-prose text-sm leading-6 text-slate-300">
-            This global room is open to everyone. Confirmed match signals will
-            appear here as the fixture projection is connected to live data.
-          </p>
-          <p className="mt-5 text-sm font-medium text-slate-400">
-            No sign-in or wallet is needed to follow a match.
-          </p>
-        </section>
+            <section className="mt-5 rounded-3xl border border-dashed border-slate-700 bg-slate-900/60 p-6 sm:p-8">
+              <p className="text-xs font-semibold tracking-[0.16em] text-cyan-200">
+                MATCH SIGNALS
+              </p>
+              <h2 className="mt-3 text-xl font-bold text-white">
+                Following this fixture together
+              </h2>
+              <p className="mt-2 max-w-prose text-sm leading-6 text-slate-300">
+                This global room is open to everyone. Confirmed match signals will
+                appear here as the fixture projection is connected to live data.
+              </p>
+              <p className="mt-5 text-sm font-medium text-slate-400">
+                No sign-in or wallet is needed to follow a match.
+              </p>
+            </section>
+          </>
+        )}
       </div>
     </main>
   )

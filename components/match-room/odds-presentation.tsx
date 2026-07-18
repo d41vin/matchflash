@@ -18,8 +18,10 @@ function Probability({ label, value }: { label: string; value: number }) {
 
 export function OddsPresentation({
   fixture,
+  visibleActionIds,
 }: {
   fixture: MatchRoomProjection
+  visibleActionIds?: ReadonlySet<number | string>
 }) {
   const timeline = useQuery(api.fixture_timeline.list, {
     fixtureId: fixture.fixtureId,
@@ -40,7 +42,13 @@ export function OddsPresentation({
     )
   }
 
-  const swings = timeline?.filter((card) => card.type === "oddsSwing") ?? []
+  const swings =
+    timeline?.filter(
+      (card) =>
+        card.type === "oddsSwing" &&
+        (visibleActionIds === undefined || visibleActionIds.has(card.actionId))
+    ) ?? []
+  const isReplay = visibleActionIds !== undefined
   return (
     <section className="mt-5 rounded-3xl border border-cyan-300/20 bg-cyan-300/5 p-5">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -51,11 +59,17 @@ export function OddsPresentation({
           {fixture.odds.provenance.bookmaker}
         </p>
       </div>
-      <div className="mt-4 grid grid-cols-3 gap-2 sm:gap-3">
-        <Probability label={fixture.participant1} value={fixture.odds.home} />
-        <Probability label="Draw" value={fixture.odds.draw} />
-        <Probability label={fixture.participant2} value={fixture.odds.away} />
-      </div>
+      {isReplay ? (
+        <p className="mt-4 text-sm leading-6 text-slate-300">
+          Historical odds moments appear as their classified swings are reached.
+        </p>
+      ) : (
+        <div className="mt-4 grid grid-cols-3 gap-2 sm:gap-3">
+          <Probability label={fixture.participant1} value={fixture.odds.home} />
+          <Probability label="Draw" value={fixture.odds.draw} />
+          <Probability label={fixture.participant2} value={fixture.odds.away} />
+        </div>
+      )}
       {swings.length > 0 ? (
         <div className="mt-4 border-t border-cyan-300/15 pt-4">
           <p className="text-xs font-semibold tracking-[0.14em] text-cyan-100">

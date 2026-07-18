@@ -32,9 +32,11 @@ function isFieldReactionType(type: string): type is PhaseOneFieldEvent["type"] {
 export function FieldVisualization({
   fixtureId,
   possession,
+  visibleActionIds,
 }: {
   fixtureId: number
   possession: MatchRoomProjection["field"]["possession"]
+  visibleActionIds?: ReadonlySet<number | string>
 }) {
   const timeline = useQuery(api.fixture_timeline.list, { fixtureId })
   const [reaction, setReaction] = useState<FieldReaction | null>(null)
@@ -52,17 +54,27 @@ export function FieldVisualization({
       } => typeof event.actionId === "number" && isFieldReactionType(event.type)
     )
 
+    const visibleFieldEvents = visibleActionIds
+      ? fieldEvents.filter((event) => visibleActionIds.has(event.actionId))
+      : fieldEvents
+
     if (seenActionIds.current === null) {
       seenActionIds.current = new Set(
-        fieldEvents.map((event) => event.actionId)
+        visibleFieldEvents.map((event) => event.actionId)
       )
       return
     }
 
-    const nextEvent = [...fieldEvents]
+    for (const actionId of seenActionIds.current) {
+      if (!visibleFieldEvents.some((event) => event.actionId === actionId)) {
+        seenActionIds.current.delete(actionId)
+      }
+    }
+
+    const nextEvent = [...visibleFieldEvents]
       .reverse()
       .find((event) => !seenActionIds.current?.has(event.actionId))
-    for (const event of fieldEvents) {
+    for (const event of visibleFieldEvents) {
       seenActionIds.current.add(event.actionId)
     }
     if (!nextEvent) return
@@ -74,7 +86,7 @@ export function FieldVisualization({
     setReaction(nextReaction)
     const timer = window.setTimeout(() => setReaction(null), 1_800)
     return () => window.clearTimeout(timer)
-  }, [timeline])
+  }, [timeline, visibleActionIds])
 
   const isTeamOnePressure = possession?.team === 1
   const isTeamTwoPressure = possession?.team === 2
