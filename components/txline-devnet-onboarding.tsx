@@ -31,6 +31,27 @@ async function readJson<T>(response: Response) {
   return payload
 }
 
+async function confirmWithHttpPolling(connection: Connection, signature: string) {
+  for (let attempt = 0; attempt < 45; attempt += 1) {
+    const status = (
+      await connection.getSignatureStatuses([signature], {
+        searchTransactionHistory: true,
+      })
+    ).value[0]
+    if (status?.err) {
+      throw new Error(`Solana transaction failed: ${JSON.stringify(status.err)}`)
+    }
+    if (
+      status?.confirmationStatus === "confirmed" ||
+      status?.confirmationStatus === "finalized"
+    ) {
+      return
+    }
+    await new Promise((resolve) => setTimeout(resolve, 1000))
+  }
+  throw new Error("Solana transaction was not confirmed within 45 seconds.")
+}
+
 function TxlineOnboarding({ network }: { network: "devnet" | "mainnet" }) {
   const { connect, isConnecting } = useConnect()
   const { isConnected } = usePhantom()
@@ -94,14 +115,7 @@ function TxlineOnboarding({ network }: { network: "devnet" | "mainnet" }) {
           const sentAccount = await solana.signAndSendTransaction(
             account.transaction
           )
-          await connection.confirmTransaction(
-            {
-              signature: sentAccount.signature,
-              blockhash: account.latestBlockhash.blockhash,
-              lastValidBlockHeight: account.latestBlockhash.lastValidBlockHeight,
-            },
-            "confirmed"
-          )
+          await confirmWithHttpPolling(connection, sentAccount.signature)
           setCreatedTokenAccount(true)
           await new Promise((resolve) => setTimeout(resolve, 3000))
         }
@@ -118,14 +132,7 @@ function TxlineOnboarding({ network }: { network: "devnet" | "mainnet" }) {
       setCreatedTokenAccount(built.needsUserTokenAccount)
       await preflightDevnetSubscription(connection, built.transaction)
       const sent = await solana.signAndSendTransaction(built.transaction)
-      await connection.confirmTransaction(
-        {
-          signature: sent.signature,
-          blockhash: built.latestBlockhash.blockhash,
-          lastValidBlockHeight: built.latestBlockhash.lastValidBlockHeight,
-        },
-        "confirmed"
-      )
+      await confirmWithHttpPolling(connection, sent.signature)
       setTransactionSignature(sent.signature)
       setSubscriberAddress(solana.publicKey)
       setActivationJwt(guest.token)
