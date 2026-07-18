@@ -9,6 +9,7 @@ import {
   useSolana,
 } from "@phantom/react-sdk"
 import { ConvexProviderWithAuth, ConvexReactClient } from "convex/react"
+import { usePathname } from "next/navigation"
 import {
   createContext,
   useCallback,
@@ -51,6 +52,7 @@ async function readJson<T>(response: Response) {
 }
 
 function MatchFlashAuthProvider({ children }: PropsWithChildren) {
+  const pathname = usePathname()
   const { addresses, isConnected, isLoading: phantomIsLoading } = usePhantom()
   const { open } = useModal()
   const { solana, isAvailable } = useSolana()
@@ -104,10 +106,14 @@ function MatchFlashAuthProvider({ children }: PropsWithChildren) {
       return
     }
 
+    if (pathname === "/txline-devnet") {
+      return
+    }
+
     if (walletAddress && !tokenRef.current && !isAuthenticating) {
       void authenticate().catch(() => undefined)
     }
-  }, [authenticate, isAuthenticating, isConnected, walletAddress])
+  }, [authenticate, isAuthenticating, isConnected, pathname, walletAddress])
 
   const requestSignIn = useCallback(async () => {
     if (!isConnected) {
