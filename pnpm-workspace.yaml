@@ -5,6 +5,6 @@ allowBuilds:
   unrs-resolver: true
   msw: false
   esbuild: true
-  bufferutil: set this to true or false
-  utf-8-validate: set this to true or false
-  bigint-buffer: set this to true or false
+  bufferutil: true
+  utf-8-validate: true
+  bigint-buffer: true
