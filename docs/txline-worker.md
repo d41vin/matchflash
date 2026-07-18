@@ -18,7 +18,7 @@ Ticket 03 runs one persistent, outbound-only Node process. It owns the authentic
 
 ## Windows Task Scheduler
 
-Open an elevated PowerShell and register the supplied boot task:
+Open an elevated PowerShell and register the supplied boot task. The registration command passes the XML as a Windows string, so the checked-in XML deliberately declares UTF-16:
 
 ```powershell
 Register-ScheduledTask -TaskName "MatchFlash TxLINE worker" -Xml (Get-Content -Raw .\scripts\matchflash-txline-worker.xml) -Force
