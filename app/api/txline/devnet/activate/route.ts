@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 
 import { txlineDevnetActivationError } from "@/lib/txline-devnet-activation-error"
 import { verifyTxlineDevnetActivationProof } from "@/lib/txline-devnet-activation-proof"
+import { txlineDevnetActivationPayload } from "@/lib/txline-devnet-activation-response"
 import { TXLINE_DEVNET } from "@/lib/txline-devnet-subscription"
 
 const DEVNET_ACTIVATION_URL = "https://txline-dev.txodds.com/api/token/activate"
@@ -103,7 +104,7 @@ export async function POST(request: NextRequest) {
     }),
     cache: "no-store",
   })
-  const payload = await upstream.json().catch(() => null)
+  const payload = txlineDevnetActivationPayload(await upstream.text())
 
   if (!upstream.ok) {
     const diagnostic =
