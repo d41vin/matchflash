@@ -4,6 +4,18 @@ import { applyFlashContribution, decayedHeat } from "../lib/heat"
 import { internalMutation, type MutationCtx } from "./_generated/server"
 import type { MatchFlashDataModel } from "./schema"
 
+type HeatUpdate = { heat: number }
+
+export function peakHeatPatch(
+  currentPeak: number | undefined,
+  heat: HeatUpdate,
+  updatedAt: number
+) {
+  return currentPeak === undefined || heat.heat > currentPeak
+    ? { peakHeat: heat.heat, peakHeatUpdatedAt: updatedAt }
+    : {}
+}
+
 function database(
   ctx: MutationCtx
 ): GenericDatabaseWriter<MatchFlashDataModel> {
@@ -31,7 +43,10 @@ export async function applyFlashHeat(
     impactScore,
     capturedAt
   )
-  await db.patch(state._id, heat)
+  await db.patch(state._id, {
+    ...heat,
+    ...peakHeatPatch(state.peakHeat, heat, capturedAt),
+  })
 }
 
 /** Persists quiet-match Heat decay; public queries only ever read it. */

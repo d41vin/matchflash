@@ -8,6 +8,7 @@
  * @module
  */
 
+import type * as chat from "../chat.js";
 import type * as crons from "../crons.js";
 import type * as fixture_phase from "../fixture_phase.js";
 import type * as fixture_projection from "../fixture_projection.js";
@@ -18,7 +19,12 @@ import type * as ingestion from "../ingestion.js";
 import type * as odds from "../odds.js";
 import type * as participation from "../participation.js";
 import type * as participation_rules from "../participation_rules.js";
+import type * as predictions from "../predictions.js";
+import type * as recaps from "../recaps.js";
 import type * as reconciliation from "../reconciliation.js";
+import type * as reliability from "../reliability.js";
+import type * as rooms from "../rooms.js";
+import type * as trophy_eligibility from "../trophy_eligibility.js";
 
 import type {
   ApiFromModules,
@@ -27,6 +33,7 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  chat: typeof chat;
   crons: typeof crons;
   fixture_phase: typeof fixture_phase;
   fixture_projection: typeof fixture_projection;
@@ -37,7 +44,12 @@ declare const fullApi: ApiFromModules<{
   odds: typeof odds;
   participation: typeof participation;
   participation_rules: typeof participation_rules;
+  predictions: typeof predictions;
+  recaps: typeof recaps;
   reconciliation: typeof reconciliation;
+  reliability: typeof reliability;
+  rooms: typeof rooms;
+  trophy_eligibility: typeof trophy_eligibility;
 }>;
 
 /**

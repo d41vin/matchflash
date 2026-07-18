@@ -61,9 +61,14 @@ export const schema = defineSchema({
       dataSuspended: v.boolean(),
       periodSuspectSinceAdjustment: v.optional(v.boolean()),
     }),
+    // A reliability flag may later clear, but the finished Recap Receipt must
+    // retain the fact that the fixture had a degraded period.
+    hadReliabilityIssue: v.optional(v.boolean()),
     lastScoreSeq: v.optional(v.number()),
     heat: v.optional(v.number()),
     heatUpdatedAt: v.optional(v.number()),
+    peakHeat: v.optional(v.number()),
+    peakHeatUpdatedAt: v.optional(v.number()),
     lastActivityHeatUpdateAt: v.optional(v.number()),
     lastPossessionHeatUpdateAt: v.optional(v.number()),
     pendingPossessionTicks: v.optional(v.number()),
@@ -308,7 +313,8 @@ export const schema = defineSchema({
     pointsAwarded: v.optional(v.number()),
   })
     .index("by_promptId", ["promptId"])
-    .index("by_promptId_and_userId", ["promptId", "userId"]),
+    .index("by_promptId_and_userId", ["promptId", "userId"])
+    .index("by_userId", ["userId"]),
 
   predictionCorrectionNotes: defineTable({
     fixtureId: v.number(),

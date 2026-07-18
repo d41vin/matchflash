@@ -14,7 +14,7 @@ import {
   applyPossessionContribution,
   shouldApplyPossessionContribution,
 } from "../lib/heat"
-import { applyFlashHeat } from "./heat"
+import { applyFlashHeat, peakHeatPatch } from "./heat"
 import {
   applyPredictionEvent,
   queueManualReviewsForAction,
@@ -23,6 +23,7 @@ import {
 import { ensureGlobalRoom } from "./rooms"
 import type { MatchFlashDataModel } from "./schema"
 import type { Id } from "./_generated/dataModel"
+import { reliabilityWasFlagged } from "./reliability"
 
 type ReconciliationDatabase = GenericDatabaseWriter<MatchFlashDataModel>
 
@@ -215,6 +216,7 @@ async function updatePossessionHeat(
     )
     await db.patch(state._id, {
       ...heat,
+      ...peakHeatPatch(state.peakHeat, heat, capturedAt),
       lastPossessionHeatUpdateAt: capturedAt,
       pendingPossessionTicks: 0,
     })
@@ -397,7 +399,14 @@ async function persistReconciledFixture(
   db: ReconciliationDatabase,
   reconciled: ReconciledFixture,
   existingFixture: { _id: Id<"fixtures"> } | undefined,
-  existingState: { _id: Id<"matchStates"> } | undefined,
+  existingState:
+    | {
+        _id: Id<"matchStates">
+        hadReliabilityIssue?: boolean
+        peakHeat?: number
+        peakHeatUpdatedAt?: number
+      }
+    | undefined,
   raw: unknown,
   capturedAt: number
 ) {
@@ -414,10 +423,23 @@ async function persistReconciledFixture(
     }
   }
 
+  const state = {
+    ...reconciled.state,
+    ...(existingState?.hadReliabilityIssue ||
+    reliabilityWasFlagged(reconciled.state.reliability)
+      ? { hadReliabilityIssue: true }
+      : {}),
+    ...(existingState?.peakHeat !== undefined
+      ? {
+          peakHeat: existingState.peakHeat,
+          peakHeatUpdatedAt: existingState.peakHeatUpdatedAt,
+        }
+      : {}),
+  }
   if (existingState) {
-    await db.replace(existingState._id, reconciled.state)
+    await db.replace(existingState._id, state)
   } else {
-    await db.insert("matchStates", reconciled.state)
+    await db.insert("matchStates", state)
   }
 
   await ensureGlobalRoom(

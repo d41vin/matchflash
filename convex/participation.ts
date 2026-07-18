@@ -5,7 +5,9 @@ import { mutation, type MutationCtx } from "./_generated/server"
 import { effectiveFixturePhase } from "./fixture_phase"
 import { isLiveFixturePhase } from "./participation_rules"
 import type { MatchFlashDataModel } from "./schema"
+import { recordTrophyEligibility } from "./trophy_eligibility"
 import { ACTIVITY_THROTTLE_MS, applyActivityContribution } from "../lib/heat"
+import { peakHeatPatch } from "./heat"
 
 const REACTION_COLORS = ["cyan", "violet", "amber", "rose"]
 
@@ -66,8 +68,10 @@ async function applyFixtureActivityHeat(
   ).length
   if (recentCount === 0) return
 
+  const heat = applyActivityContribution(heatState, recentCount, now)
   await db.patch(state._id, {
-    ...applyActivityContribution(heatState, recentCount, now),
+    ...heat,
+    ...peakHeatPatch(state.peakHeat, heat, now),
     lastActivityHeatUpdateAt: now,
   })
 }
@@ -145,21 +149,7 @@ export const recordLiveReaction = mutation({
     })
     await applyFixtureActivityHeat(db, args.fixtureId, createdAt)
 
-    const eligibility = await db
-      .query("trophyEligibility")
-      .withIndex("by_userId_and_fixtureId", (query) =>
-        query.eq("userId", user._id).eq("fixtureId", args.fixtureId)
-      )
-      .unique()
-
-    if (!eligibility) {
-      await db.insert("trophyEligibility", {
-        userId: user._id,
-        fixtureId: args.fixtureId,
-        eligibleAt: createdAt,
-        claimStatus: "unclaimed",
-      })
-    }
+    await recordTrophyEligibility(db, user._id, args.fixtureId, createdAt)
 
     return { reactionId }
   },

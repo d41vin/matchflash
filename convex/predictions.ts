@@ -11,6 +11,9 @@ import {
 import type { Id } from "./_generated/dataModel"
 import { currentUser, requireActiveRoom } from "./rooms"
 import type { MatchFlashDataModel } from "./schema"
+import { effectiveFixturePhase } from "./fixture_phase"
+import { isLiveFixturePhase } from "./participation_rules"
+import { recordTrophyEligibility } from "./trophy_eligibility"
 
 const LOCK_WINDOW_MS = 20_000
 const NEXT_GOAL_OPTIONS = [
@@ -429,6 +432,17 @@ export const answer = mutation({
   handler: async (ctx, args) => {
     const db = database(ctx)
     const room = await requireActiveRoom(db, args.roomId)
+    const fixtureState = await db
+      .query("fixtureStates")
+      .withIndex("by_fixtureId", (query) => query.eq("fixtureId", room.fixtureId))
+      .unique()
+    if (
+      !isLiveFixturePhase(
+        effectiveFixturePhase(room.fixtureId, fixtureState?.phase)
+      )
+    ) {
+      throw new Error("Predictions are available only while the fixture is live.")
+    }
     const prompt = await db.get("predictionPrompts", args.promptId)
     if (!prompt || prompt.fixtureId !== room.fixtureId) {
       throw new Error("This prediction is not available in this Room.")
@@ -468,13 +482,15 @@ export const answer = mutation({
         score: 0,
       })
     }
+    const createdAt = Date.now()
     const predictionId = await db.insert("predictions", {
       promptId: prompt._id,
       roomId: room._id,
       userId: user._id,
       optionId: args.optionId,
-      createdAt: Date.now(),
+      createdAt,
     })
+    await recordTrophyEligibility(db, user._id, room.fixtureId, createdAt)
     return { predictionId }
   },
 })

@@ -7,6 +7,7 @@ import { FixtureFeedNotice } from "./fixture-feed-notice"
 import { FieldVisualization } from "./field-visualization"
 import { OddsPresentation } from "./odds-presentation"
 import { ReplayMatchRoom } from "./replay-match-room"
+import { RecapReceipt } from "./recap-receipt"
 import { SocialRooms } from "./social-rooms"
 
 export function MatchRoomView({ fixture }: { fixture: MatchRoomProjection }) {
@@ -53,7 +54,10 @@ export function MatchRoomView({ fixture }: { fixture: MatchRoomProjection }) {
         </section>
 
         {fixture.match.status === "final" ? (
-          <ReplayMatchRoom fixture={fixture} />
+          <>
+            <ReplayMatchRoom fixture={fixture} />
+            <RecapReceipt fixtureId={fixture.fixtureId} />
+          </>
         ) : (
           <>
             <FixtureFeedNotice fixture={fixture} />
