@@ -42,6 +42,7 @@ export function TxlineDevnetOnboarding() {
   )
   const [createdTokenAccount, setCreatedTokenAccount] = useState(false)
   const [apiToken, setApiToken] = useState<string | null>(null)
+  const [activationJwt, setActivationJwt] = useState<string | null>(null)
 
   async function connectDevnetWallet() {
     setError(null)
@@ -64,8 +65,14 @@ export function TxlineDevnetOnboarding() {
     }
     setError(null)
     setState("subscribing")
+    setActivationJwt(null)
+    setTransactionSignature(null)
+    setSubscriberAddress(null)
     try {
       await solana.switchNetwork("devnet")
+      const guest = await readJson<{ token: string }>(
+        await fetch("/api/txline/devnet/guest", { method: "POST" })
+      )
       const connection = new Connection(TXLINE_DEVNET.rpcUrl, "confirmed")
       const built = await buildDevnetSubscriptionTransaction(
         connection,
@@ -84,8 +91,10 @@ export function TxlineDevnetOnboarding() {
       )
       setTransactionSignature(sent.signature)
       setSubscriberAddress(solana.publicKey)
+      setActivationJwt(guest.token)
       setState("subscribed")
     } catch (cause) {
+      setActivationJwt(null)
       setState("error")
       setError(
         cause instanceof Error
@@ -96,8 +105,15 @@ export function TxlineDevnetOnboarding() {
   }
 
   async function activate() {
-    if (!transactionSignature || !subscriberAddress || !solana.publicKey) {
-      setError("Create the Devnet subscription before activating it.")
+    if (
+      !transactionSignature ||
+      !subscriberAddress ||
+      !solana.publicKey ||
+      !activationJwt
+    ) {
+      setError(
+        "Create a new Devnet subscription before activating it so TxLINE can associate the guest session with the transaction."
+      )
       return
     }
     if (solana.publicKey !== subscriberAddress) {
@@ -110,12 +126,9 @@ export function TxlineDevnetOnboarding() {
     setState("activating")
     try {
       await solana.switchNetwork("devnet")
-      const guest = await readJson<{ token: string }>(
-        await fetch("/api/txline/devnet/guest", { method: "POST" })
-      )
       const signed = await solana.signMessage(
         new TextEncoder().encode(
-          activationMessage(transactionSignature, guest.token)
+          activationMessage(transactionSignature, activationJwt)
         )
       )
       if (signed.publicKey !== subscriberAddress) {
@@ -128,7 +141,7 @@ export function TxlineDevnetOnboarding() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            jwt: guest.token,
+            jwt: activationJwt,
             txSig: transactionSignature,
             walletSignature: base64(signed.signature),
           }),
