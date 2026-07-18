@@ -8,6 +8,7 @@ import {
   fixtureHasReliabilityWarning,
   useFixtureFeedHealth,
 } from "./fixture-feed-notice"
+import { HeatBadge } from "./heat-badge"
 
 export function FixtureCard({ fixture }: { fixture: MatchRoomProjection }) {
   const health = useFixtureFeedHealth(fixture)
@@ -19,9 +20,14 @@ export function FixtureCard({ fixture }: { fixture: MatchRoomProjection }) {
       className="group block rounded-3xl border border-white/10 bg-slate-900 p-5 transition hover:border-cyan-300/60 hover:bg-slate-800 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-cyan-300"
       href={fixture.matchRoomHref}
     >
-      <div className="flex items-center justify-between gap-3 text-xs font-semibold tracking-[0.14em] text-cyan-200">
-        <span>{fixture.match.statusLabel}</span>
-        <span className="text-slate-400">{fixture.stage}</span>
+      <div className="flex items-start justify-between gap-3 text-xs font-semibold tracking-[0.14em] text-cyan-200">
+        <div>
+          <span>{fixture.match.statusLabel}</span>
+          <p className="mt-1 font-medium tracking-normal text-slate-400">
+            {fixture.stage}
+          </p>
+        </div>
+        <HeatBadge heat={fixture.heat.value} />
       </div>
       <div className="mt-5 grid grid-cols-[1fr_auto_1fr] items-center gap-3 text-center">
         <p className="text-lg font-semibold text-white">

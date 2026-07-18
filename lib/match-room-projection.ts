@@ -20,6 +20,13 @@ export type FixtureRoomSource = {
       dataSuspended: boolean
       periodSuspectSinceAdjustment?: boolean
     }
+    heat?: number
+    heatUpdatedAt?: number
+    possession?: {
+      team: 1 | 2
+      intensity: "safe" | "attack" | "danger" | "highDanger"
+      since: number
+    }
     updatedAt: number
   }
   rawProviderPayload?: unknown
@@ -48,6 +55,13 @@ export type MatchRoomProjection = {
     updatedAt: number
     health: "current" | "stale"
     reliability: FixtureRoomSource["state"]["reliability"]
+  }
+  heat: {
+    value: number
+    updatedAt: number
+  }
+  field: {
+    possession?: FixtureRoomSource["state"]["possession"]
   }
 }
 
@@ -107,6 +121,13 @@ export function projectMatchRoom(
       health:
         now - state.updatedAt >= FEED_STALE_AFTER_MS ? "stale" : "current",
       reliability: state.reliability,
+    },
+    heat: {
+      value: state.heat ?? 0,
+      updatedAt: state.heatUpdatedAt ?? state.updatedAt,
+    },
+    field: {
+      ...(state.possession ? { possession: state.possession } : {}),
     },
   }
 }

@@ -10,6 +10,11 @@ import {
   classifyCoreFlashCard,
   discardedActionId,
 } from "../lib/flash-classification"
+import {
+  applyFlashContribution,
+  applyPossessionContribution,
+  shouldApplyPossessionContribution,
+} from "../lib/heat"
 import type { MatchFlashDataModel } from "./schema"
 import type { Id } from "./_generated/dataModel"
 
@@ -160,6 +165,82 @@ export async function reconcileCapturedScoreEvent(
     capturedAt
   )
   await updateFlashTimeline(db, raw, reconciled, capturedAt)
+  await updatePossessionHeat(db, reconciled, capturedAt)
+}
+
+async function applyFlashHeat(
+  db: ReconciliationDatabase,
+  fixtureId: number,
+  impactScore: number,
+  capturedAt: number
+) {
+  const state = await db
+    .query("matchStates")
+    .withIndex("by_fixtureId", (query) => query.eq("fixtureId", fixtureId))
+    .unique()
+  if (!state) return
+
+  const heat = applyFlashContribution(
+    {
+      heat: state.heat ?? 0,
+      heatUpdatedAt: state.heatUpdatedAt ?? capturedAt,
+    },
+    impactScore,
+    capturedAt
+  )
+  await db.patch(state._id, heat)
+}
+
+async function updatePossessionHeat(
+  db: ReconciliationDatabase,
+  reconciled: ReconciledFixture,
+  capturedAt: number
+) {
+  const possession = reconciled.state.possession
+  if (possession?.since !== capturedAt) return
+
+  const state = await db
+    .query("matchStates")
+    .withIndex("by_fixtureId", (query) =>
+      query.eq("fixtureId", reconciled.state.fixtureId)
+    )
+    .unique()
+  if (!state) return
+
+  if (
+    possession.intensity !== "danger" &&
+    possession.intensity !== "highDanger"
+  ) {
+    if ((state.pendingPossessionTicks ?? 0) > 0) {
+      await db.patch(state._id, { pendingPossessionTicks: 0 })
+    }
+    return
+  }
+
+  const lastUpdateAt = state.lastPossessionHeatUpdateAt
+  if (
+    lastUpdateAt === undefined ||
+    shouldApplyPossessionContribution(lastUpdateAt, capturedAt)
+  ) {
+    const heat = applyPossessionContribution(
+      {
+        heat: state.heat ?? 0,
+        heatUpdatedAt: state.heatUpdatedAt ?? capturedAt,
+      },
+      (state.pendingPossessionTicks ?? 0) + 1,
+      capturedAt
+    )
+    await db.patch(state._id, {
+      ...heat,
+      lastPossessionHeatUpdateAt: capturedAt,
+      pendingPossessionTicks: 0,
+    })
+    return
+  }
+
+  await db.patch(state._id, {
+    pendingPossessionTicks: (state.pendingPossessionTicks ?? 0) + 1,
+  })
 }
 
 async function updateFlashTimeline(
@@ -263,6 +344,12 @@ async function updateFlashTimeline(
     createdAt: capturedAt,
     updatedAt: capturedAt,
   })
+  await applyFlashHeat(
+    db,
+    classified.fixtureId,
+    classified.impactScore,
+    capturedAt
+  )
 }
 
 async function persistReconciledFixture(

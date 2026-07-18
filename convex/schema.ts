@@ -62,9 +62,28 @@ export const schema = defineSchema({
       periodSuspectSinceAdjustment: v.optional(v.boolean()),
     }),
     lastScoreSeq: v.optional(v.number()),
+    heat: v.optional(v.number()),
+    heatUpdatedAt: v.optional(v.number()),
+    lastActivityHeatUpdateAt: v.optional(v.number()),
+    lastPossessionHeatUpdateAt: v.optional(v.number()),
+    pendingPossessionTicks: v.optional(v.number()),
+    possession: v.optional(
+      v.object({
+        team: v.union(v.literal(1), v.literal(2)),
+        intensity: v.union(
+          v.literal("safe"),
+          v.literal("attack"),
+          v.literal("danger"),
+          v.literal("highDanger")
+        ),
+        since: v.number(),
+      })
+    ),
     // The source heartbeat used to detect that a live display has gone stale.
     updatedAt: v.number(),
-  }).index("by_fixtureId", ["fixtureId"]),
+  })
+    .index("by_fixtureId", ["fixtureId"])
+    .index("by_phase", ["phase"]),
 
   // Mutable action records are internal reconciliation state. Source payloads
   // remain available only at the raw capture boundary and never reach a query.
@@ -89,9 +108,13 @@ export const schema = defineSchema({
       v.literal("goal"),
       v.literal("card"),
       v.literal("corner"),
+      v.literal("varReview"),
+      v.literal("varResolved"),
       v.literal("phaseChange")
     ),
     title: v.string(),
+    participant: v.optional(v.union(v.literal(1), v.literal(2))),
+    impactScore: v.optional(v.number()),
     confirmed: v.literal(true),
     retracted: v.boolean(),
     createdAt: v.number(),
@@ -136,7 +159,8 @@ export const schema = defineSchema({
     createdAt: v.number(),
   })
     .index("by_fixtureId", ["fixtureId"])
-    .index("by_fixtureId_and_userId", ["fixtureId", "userId"]),
+    .index("by_fixtureId_and_userId", ["fixtureId", "userId"])
+    .index("by_fixtureId_and_createdAt", ["fixtureId", "createdAt"]),
 
   // This intentionally contains no TxLINE-derived data. It is the minimal
   // record that survives the later Archive Mode claim-only path.

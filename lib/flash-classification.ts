@@ -1,12 +1,15 @@
 import type { ReliabilityState } from "./fixture-reconciliation"
 
-export type CoreFlashType = "goal" | "card" | "corner" | "phaseChange"
+export type CoreFlashType =
+  "goal" | "card" | "corner" | "varReview" | "varResolved" | "phaseChange"
 
 export type CoreFlashCard = {
   fixtureId: number
   actionId: number
   type: CoreFlashType
   title: string
+  impactScore: number
+  participant?: 1 | 2
 }
 
 const FINAL_STATUS_IDS = [5, 10, 13, 15, 16, 17]
@@ -34,11 +37,17 @@ function booleanAt(value: unknown) {
   return typeof value === "boolean" ? value : undefined
 }
 
+function participantAt(value: unknown): 1 | 2 | undefined {
+  const participant = numberAt(value)
+  return participant === 1 || participant === 2 ? participant : undefined
+}
+
 type SourceAction = {
   action: string
   actionId: number
   confirmed: boolean
   statusId?: number
+  participant?: 1 | 2
 }
 
 function sourceAction(raw: unknown): SourceAction | null {
@@ -66,6 +75,7 @@ function sourceAction(raw: unknown): SourceAction | null {
       // action payload and does not repeat the original Confirmed field.
       confirmed: true,
       statusId: numberAt(replacement.StatusId),
+      participant: participantAt(data?.Participant),
     }
   }
 
@@ -77,13 +87,11 @@ function sourceAction(raw: unknown): SourceAction | null {
     actionId,
     confirmed: booleanAt(update.Confirmed) === true,
     statusId: numberAt(update.StatusId) ?? numberAt(data?.StatusId),
+    participant: participantAt(update.Participant),
   }
 }
 
-function canCreateCard(
-  type: CoreFlashType,
-  reliability: ReliabilityState
-) {
+function canCreateCard(type: CoreFlashType, reliability: ReliabilityState) {
   if (reliability.dataSuspended) return false
   if (type === "corner") {
     return (
@@ -125,12 +133,23 @@ export function classifyCoreFlashCard(
 
   let type: CoreFlashType | null = null
   let title: string | null = null
+  let impactScore: number | null = null
   if (["yellow_card", "red_card"].includes(source.action)) {
     type = "card"
     title = source.action === "red_card" ? "Red card" : "Yellow card"
+    impactScore = source.action === "red_card" ? 45 : 20
   } else if (source.action === "corner") {
     type = "corner"
     title = "Corner"
+    impactScore = 12
+  } else if (source.action === "var") {
+    type = "varReview"
+    title = "VAR review"
+    impactScore = 25
+  } else if (source.action === "var_end") {
+    type = "varResolved"
+    title = "VAR decision"
+    impactScore = 15
   } else if (
     source.action === "kickoff" ||
     source.action === "halftime_finalised" ||
@@ -139,17 +158,28 @@ export function classifyCoreFlashCard(
   ) {
     type = "phaseChange"
     title = phaseTitle(source.action, source.statusId)
+    impactScore = 15
   }
 
   if (
     !type ||
     !title ||
+    impactScore === null ||
     (!ignoreReliability && !canCreateCard(type, reliability))
   ) {
     return null
   }
 
-  return { fixtureId, actionId: source.actionId, type, title }
+  return {
+    fixtureId,
+    actionId: source.actionId,
+    type,
+    title,
+    impactScore,
+    ...(source.participant !== undefined
+      ? { participant: source.participant }
+      : {}),
+  }
 }
 
 /** Returns the original action identified by an explicit source discard. */

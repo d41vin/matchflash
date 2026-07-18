@@ -22,6 +22,16 @@ export type ReconciledMatchState = {
   score2: number
   reliability: ReliabilityState
   lastScoreSeq?: number
+  heat?: number
+  heatUpdatedAt?: number
+  lastActivityHeatUpdateAt?: number
+  lastPossessionHeatUpdateAt?: number
+  pendingPossessionTicks?: number
+  possession?: {
+    team: 1 | 2
+    intensity: "safe" | "attack" | "danger" | "highDanger"
+    since: number
+  }
   updatedAt: number
 }
 
@@ -174,6 +184,48 @@ function nextReliability(
   return reliability
 }
 
+function possessionIntensity(action: string, rawIntensity: unknown) {
+  if (action === "safe_possession") return "safe" as const
+  if (action === "attack_possession") return "attack" as const
+  if (action === "danger_possession") return "danger" as const
+  if (action === "high_danger_possession") return "highDanger" as const
+
+  switch (rawIntensity) {
+    case "SafePossession":
+      return "safe" as const
+    case "AttackPossession":
+      return "attack" as const
+    case "DangerPossession":
+      return "danger" as const
+    case "HighDangerPossession":
+      return "highDanger" as const
+    default:
+      return undefined
+  }
+}
+
+function nextPossession(
+  current: ReconciledMatchState["possession"],
+  update: JsonObject,
+  data: JsonObject | undefined,
+  action: string,
+  capturedAt: number
+): ReconciledMatchState["possession"] {
+  const intensity = possessionIntensity(
+    action,
+    update.PossessionType ?? data?.PossessionType
+  )
+  const team = numberAt(
+    update.Participant ??
+      data?.Participant ??
+      update.Possession ??
+      data?.Possession
+  )
+  if (!intensity || (team !== 1 && team !== 2)) return current
+
+  return { team: team as 1 | 2, intensity, since: capturedAt }
+}
+
 /**
  * Reconciles one persisted TxLINE source envelope into the safe, fixture-level
  * state that the UI may consume. Raw provider payloads intentionally stay out
@@ -234,6 +286,16 @@ export function reconcileFixtureEvent(
           : {}),
         ...(scoresFrom(update) ?? {}),
         reliability: nextReliability(base.reliability, action, data, statusId),
+        ...(() => {
+          const possession = nextPossession(
+            base.possession,
+            update,
+            data,
+            action,
+            capturedAt
+          )
+          return possession ? { possession } : {}
+        })(),
         ...(sequence !== undefined ? { lastScoreSeq: sequence } : {}),
         updatedAt: capturedAt,
       }

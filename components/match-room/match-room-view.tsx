@@ -4,6 +4,7 @@ import { LiveParticipationControls } from "@/components/match-room/live-particip
 import type { MatchRoomProjection } from "@/lib/match-room-projection"
 
 import { FixtureFeedNotice } from "./fixture-feed-notice"
+import { FieldVisualization } from "./field-visualization"
 
 export function MatchRoomView({ fixture }: { fixture: MatchRoomProjection }) {
   return (
@@ -49,6 +50,11 @@ export function MatchRoomView({ fixture }: { fixture: MatchRoomProjection }) {
         </section>
 
         <FixtureFeedNotice fixture={fixture} />
+
+        <FieldVisualization
+          fixtureId={fixture.fixtureId}
+          possession={fixture.field.possession}
+        />
 
         {fixture.match.status === "live" ? (
           <LiveParticipationControls fixtureId={fixture.fixtureId} />
