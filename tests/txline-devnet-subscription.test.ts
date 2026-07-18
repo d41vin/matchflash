@@ -7,9 +7,11 @@ import {
   activationMessage,
   apiTokenFromActivationResponse,
   buildDevnetSubscriptionTransaction,
+  createMainnetSubscribeInstruction,
   createDevnetSubscribeInstruction,
   preflightDevnetSubscription,
   TXLINE_DEVNET,
+  TXLINE_MAINNET,
   type DevnetSubscriptionConnection,
 } from "../lib/txline-devnet-subscription.ts"
 
@@ -30,6 +32,19 @@ test("creates the documented Devnet free-tier subscribe instruction", () => {
     userTokenAccount.toBase58()
   )
   assert.equal(instruction.data.toString("hex"), "fe1cbf8a9cb3b735010004")
+})
+
+test("creates the documented Mainnet real-time free-tier subscribe instruction", () => {
+  const user = Keypair.generate().publicKey
+  const { instruction } = createMainnetSubscribeInstruction(user)
+
+  assert.equal(
+    instruction.programId.toBase58(),
+    TXLINE_MAINNET.programId.toBase58()
+  )
+  assert.equal(instruction.data.toString("hex"), "fe1cbf8a9cb3b7350c0004")
+  assert.equal(TXLINE_MAINNET.serviceLevelId, 12)
+  assert.equal(TXLINE_MAINNET.subscriptionWeeks, 4)
 })
 
 test("adds the user Token-2022 account only when it is absent", async () => {

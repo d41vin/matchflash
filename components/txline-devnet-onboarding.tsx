@@ -8,8 +8,10 @@ import {
   activationMessage,
   apiTokenFromActivationResponse,
   buildDevnetSubscriptionTransaction,
+  buildMainnetSubscriptionTransaction,
   preflightDevnetSubscription,
   TXLINE_DEVNET,
+  TXLINE_MAINNET,
 } from "@/lib/txline-devnet-subscription"
 
 type OnboardingState =
@@ -28,7 +30,7 @@ async function readJson<T>(response: Response) {
   return payload
 }
 
-export function TxlineDevnetOnboarding() {
+function TxlineOnboarding({ network }: { network: "devnet" | "mainnet" }) {
   const { connect, isConnecting } = useConnect()
   const { isConnected } = usePhantom()
   const { solana, isAvailable } = useSolana()
@@ -43,17 +45,21 @@ export function TxlineDevnetOnboarding() {
   const [createdTokenAccount, setCreatedTokenAccount] = useState(false)
   const [apiToken, setApiToken] = useState<string | null>(null)
   const [activationJwt, setActivationJwt] = useState<string | null>(null)
+  const isMainnet = network === "mainnet"
+  const txline = isMainnet ? TXLINE_MAINNET : TXLINE_DEVNET
+  const networkName = isMainnet ? "Mainnet" : "Devnet"
+  const tokenEnvFile = isMainnet ? ".env.worker" : ".env.txline-devnet"
 
-  async function connectDevnetWallet() {
+  async function connectWallet() {
     setError(null)
     try {
       if (!isConnected) await connect({ provider: "injected" })
-      await solana.switchNetwork("devnet")
+      await solana.switchNetwork(network)
     } catch (cause) {
       setError(
         cause instanceof Error
           ? cause.message
-          : "Could not connect Phantom to Devnet."
+          : `Could not connect Phantom to ${networkName}.`
       )
     }
   }
@@ -69,15 +75,20 @@ export function TxlineDevnetOnboarding() {
     setTransactionSignature(null)
     setSubscriberAddress(null)
     try {
-      await solana.switchNetwork("devnet")
+      await solana.switchNetwork(network)
       const guest = await readJson<{ token: string }>(
-        await fetch("/api/txline/devnet/guest", { method: "POST" })
+        await fetch(`/api/txline/${network}/guest`, { method: "POST" })
       )
-      const connection = new Connection(TXLINE_DEVNET.rpcUrl, "confirmed")
-      const built = await buildDevnetSubscriptionTransaction(
-        connection,
-        new PublicKey(solana.publicKey)
-      )
+      const connection = new Connection(txline.rpcUrl, "confirmed")
+      const built = await (isMainnet
+        ? buildMainnetSubscriptionTransaction(
+            connection,
+            new PublicKey(solana.publicKey)
+          )
+        : buildDevnetSubscriptionTransaction(
+            connection,
+            new PublicKey(solana.publicKey)
+          ))
       setCreatedTokenAccount(built.needsUserTokenAccount)
       await preflightDevnetSubscription(connection, built.transaction)
       const sent = await solana.signAndSendTransaction(built.transaction)
@@ -99,7 +110,7 @@ export function TxlineDevnetOnboarding() {
       setError(
         cause instanceof Error
           ? cause.message
-          : "Devnet subscription was not completed."
+          : `${networkName} subscription was not completed.`
       )
     }
   }
@@ -112,7 +123,7 @@ export function TxlineDevnetOnboarding() {
       !activationJwt
     ) {
       setError(
-        "Create a new Devnet subscription before activating it so TxLINE can associate the guest session with the transaction."
+        `Create a new ${networkName} subscription before activating it so TxLINE can associate the guest session with the transaction.`
       )
       return
     }
@@ -125,7 +136,7 @@ export function TxlineDevnetOnboarding() {
     setError(null)
     setState("activating")
     try {
-      await solana.switchNetwork("devnet")
+      await solana.switchNetwork(network)
       const signed = await solana.signMessage(
         new TextEncoder().encode(
           activationMessage(transactionSignature, activationJwt)
@@ -137,7 +148,7 @@ export function TxlineDevnetOnboarding() {
         )
       }
       const activated = await readJson<unknown>(
-        await fetch("/api/txline/devnet/activate", {
+        await fetch(`/api/txline/${network}/activate`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -154,7 +165,7 @@ export function TxlineDevnetOnboarding() {
       setError(
         cause instanceof Error
           ? cause.message
-          : "Devnet activation was not completed."
+          : `${networkName} activation was not completed.`
       )
     }
   }
@@ -174,30 +185,30 @@ export function TxlineDevnetOnboarding() {
             MATCHFLASH OPERATOR TOOL
           </p>
           <h1 className="mt-3 text-3xl font-black tracking-tight">
-            TxLINE Devnet onboarding
+            TxLINE {networkName} onboarding
           </h1>
           <p className="mt-3 text-slate-300">
-            This uses only Solana Devnet. It creates a free level-1, four-week
-            TxLINE subscription and then asks Phantom to sign the API-token
-            activation message.
+            This creates a free level-{txline.serviceLevelId}, four-week TxLINE
+            subscription on Solana {networkName}, then asks Phantom to sign the
+            API-token activation message.
           </p>
         </header>
 
         <section className="rounded-xl border border-slate-700 bg-slate-900 p-5">
-          <h2 className="font-bold">1. Connect Phantom and switch to Devnet</h2>
+          <h2 className="font-bold">1. Connect Phantom and switch to {networkName}</h2>
           <p className="mt-2 text-sm text-slate-300">
-            Use the funded Solana wallet containing your 16 Devnet SOL. Never
-            enter a private key here.
+            Use the funded Solana {networkName} wallet. Never enter a private
+            key here.
           </p>
           <button
             className="mt-4 rounded-md bg-cyan-300 px-4 py-2 font-bold text-slate-950 disabled:opacity-50"
             disabled={isConnecting || busy}
-            onClick={() => void connectDevnetWallet()}
+            onClick={() => void connectWallet()}
           >
             {isConnecting
               ? "Connecting…"
               : isConnected
-                ? "Switch Phantom to Devnet"
+                ? `Switch Phantom to ${networkName}`
                 : "Connect Phantom"}
           </button>
           {walletAddress ? (
@@ -208,11 +219,12 @@ export function TxlineDevnetOnboarding() {
         </section>
 
         <section className="rounded-xl border border-slate-700 bg-slate-900 p-5">
-          <h2 className="font-bold">2. Approve the free Devnet subscription</h2>
+          <h2 className="font-bold">2. Approve the free {networkName} subscription</h2>
           <p className="mt-2 text-sm text-slate-300">
-            Phantom will show a Devnet transaction for TxLINE service level 1
-            and a four-week term. It may also create your empty Token-2022
-            account; that is normal and consumes only Devnet SOL.
+            Phantom will show a {networkName} transaction for TxLINE service
+            level {txline.serviceLevelId} and a four-week term. It may also
+            create your empty Token-2022 account; that is normal and consumes
+            only {networkName} SOL.
           </p>
           <button
             className="mt-4 rounded-md bg-cyan-300 px-4 py-2 font-bold text-slate-950 disabled:opacity-50"
@@ -226,7 +238,7 @@ export function TxlineDevnetOnboarding() {
           >
             {state === "subscribing"
               ? "Waiting for Phantom…"
-              : "Create Devnet subscription"}
+              : `Create ${networkName} subscription`}
           </button>
           {createdTokenAccount ? (
             <p className="mt-3 text-sm text-slate-300">
@@ -276,8 +288,8 @@ export function TxlineDevnetOnboarding() {
                 Copy API token
               </button>
               <p className="text-sm text-slate-300">
-                Paste it only into the ignored <code>.env.txline-devnet</code>{" "}
-                file, then run the probe command in the operator guide.
+                Paste it only into the ignored <code>{tokenEnvFile}</code> file.
+                Do not put this token in a browser variable.
               </p>
             </div>
           ) : null}
@@ -291,4 +303,12 @@ export function TxlineDevnetOnboarding() {
       </div>
     </main>
   )
+}
+
+export function TxlineDevnetOnboarding() {
+  return <TxlineOnboarding network="devnet" />
+}
+
+export function TxlineMainnetOnboarding() {
+  return <TxlineOnboarding network="mainnet" />
 }

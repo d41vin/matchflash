@@ -22,6 +22,17 @@ export const TXLINE_DEVNET = {
   tokenMint: new PublicKey("4Zao8ocPhmMgq7PdsYWyxvqySMGx7xb9cMftPMkEokRG"),
 } as const
 
+export const TXLINE_MAINNET = {
+  apiOrigin: "https://txline.txodds.com",
+  programId: new PublicKey("9ExbZjAapQww1vfcisDmrngPinHTEfpjYRWMunJgcKaA"),
+  rpcUrl: "https://api.mainnet-beta.solana.com",
+  serviceLevelId: 12,
+  subscriptionWeeks: 4,
+  tokenMint: new PublicKey("Zhw9TVKp68a1QrftncMSd6ELXKDtpVMNuMGr1jNwdeL"),
+} as const
+
+type TxlineSubscriptionConfig = typeof TXLINE_DEVNET | typeof TXLINE_MAINNET
+
 const SUBSCRIBE_DISCRIMINATOR = Buffer.from([
   254, 28, 191, 138, 156, 179, 183, 53,
 ])
@@ -69,24 +80,27 @@ export function apiTokenFromActivationResponse(payload: unknown) {
   throw new Error("TxLINE activation returned no API token.")
 }
 
-export function createDevnetSubscribeInstruction(user: PublicKey) {
+function createTxlineSubscribeInstruction(
+  config: TxlineSubscriptionConfig,
+  user: PublicKey
+) {
   const [pricingMatrix] = PublicKey.findProgramAddressSync(
     [Buffer.from("pricing_matrix")],
-    TXLINE_DEVNET.programId
+    config.programId
   )
   const [tokenTreasury] = PublicKey.findProgramAddressSync(
     [Buffer.from("token_treasury_v2")],
-    TXLINE_DEVNET.programId
+    config.programId
   )
   const userTokenAccount = getAssociatedTokenAddressSync(
-    TXLINE_DEVNET.tokenMint,
+    config.tokenMint,
     user,
     false,
     TOKEN_2022_PROGRAM_ID,
     ASSOCIATED_TOKEN_PROGRAM_ID
   )
   const tokenTreasuryVault = getAssociatedTokenAddressSync(
-    TXLINE_DEVNET.tokenMint,
+    config.tokenMint,
     tokenTreasury,
     true,
     TOKEN_2022_PROGRAM_ID,
@@ -95,21 +109,21 @@ export function createDevnetSubscribeInstruction(user: PublicKey) {
   const data = Buffer.alloc(SUBSCRIBE_DISCRIMINATOR.length + 3)
   SUBSCRIBE_DISCRIMINATOR.copy(data)
   data.writeUInt16LE(
-    TXLINE_DEVNET.serviceLevelId,
+    config.serviceLevelId,
     SUBSCRIBE_DISCRIMINATOR.length
   )
   data.writeUInt8(
-    TXLINE_DEVNET.subscriptionWeeks,
+    config.subscriptionWeeks,
     SUBSCRIBE_DISCRIMINATOR.length + 2
   )
 
   return {
     instruction: new TransactionInstruction({
-      programId: TXLINE_DEVNET.programId,
+      programId: config.programId,
       keys: [
         { pubkey: user, isSigner: true, isWritable: true },
         { pubkey: pricingMatrix, isSigner: false, isWritable: false },
-        { pubkey: TXLINE_DEVNET.tokenMint, isSigner: false, isWritable: false },
+        { pubkey: config.tokenMint, isSigner: false, isWritable: false },
         { pubkey: userTokenAccount, isSigner: false, isWritable: true },
         { pubkey: tokenTreasuryVault, isSigner: false, isWritable: true },
         { pubkey: tokenTreasury, isSigner: false, isWritable: false },
@@ -127,12 +141,37 @@ export function createDevnetSubscribeInstruction(user: PublicKey) {
   }
 }
 
+export function createDevnetSubscribeInstruction(user: PublicKey) {
+  return createTxlineSubscribeInstruction(TXLINE_DEVNET, user)
+}
+
+export function createMainnetSubscribeInstruction(user: PublicKey) {
+  return createTxlineSubscribeInstruction(TXLINE_MAINNET, user)
+}
+
 export async function buildDevnetSubscriptionTransaction(
   connection: DevnetSubscriptionConnection,
   user: PublicKey
 ) {
-  const { instruction, userTokenAccount } =
-    createDevnetSubscribeInstruction(user)
+  return buildTxlineSubscriptionTransaction(TXLINE_DEVNET, connection, user)
+}
+
+export async function buildMainnetSubscriptionTransaction(
+  connection: DevnetSubscriptionConnection,
+  user: PublicKey
+) {
+  return buildTxlineSubscriptionTransaction(TXLINE_MAINNET, connection, user)
+}
+
+async function buildTxlineSubscriptionTransaction(
+  config: TxlineSubscriptionConfig,
+  connection: DevnetSubscriptionConnection,
+  user: PublicKey
+) {
+  const { instruction, userTokenAccount } = createTxlineSubscribeInstruction(
+    config,
+    user
+  )
   const transaction = new Transaction()
   const needsUserTokenAccount =
     (await connection.getAccountInfo(userTokenAccount)) === null
@@ -143,7 +182,7 @@ export async function buildDevnetSubscriptionTransaction(
         user,
         userTokenAccount,
         user,
-        TXLINE_DEVNET.tokenMint,
+        config.tokenMint,
         TOKEN_2022_PROGRAM_ID,
         ASSOCIATED_TOKEN_PROGRAM_ID
       )

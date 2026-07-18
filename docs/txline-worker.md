@@ -5,7 +5,7 @@ Ticket 03 runs one persistent, outbound-only Node process. It owns the authentic
 ## One-time setup
 
 1. Install Node.js 20 or newer for all users, so `C:\Program Files\nodejs\node.exe` exists. If Node is elsewhere, set the machine environment variable `MATCHFLASH_NODE_PATH` to its full path.
-2. Activate a **Mainnet service-level-12** TxLINE subscription using the same Mainnet wallet, origin, and program described in the TxLINE guide. Save the returned API token. Do not use the Devnet origin or a level-1 subscription for this worker.
+2. Activate a **Mainnet service-level-12** TxLINE subscription. Start the app locally, open `http://localhost:3000/txline-mainnet`, then use the injected Phantom extension to switch to Mainnet, approve the level-12 four-week transaction, and sign its activation message. The page is unavailable in production and never asks for a private key. Save the returned API token. Do not use the Devnet origin or a level-1 subscription for this worker.
 3. Generate a long random `MATCHFLASH_WORKER_SECRET`, then set that same value as a Convex deployment environment variable and in the local `.env.worker`.
 
    ```powershell
