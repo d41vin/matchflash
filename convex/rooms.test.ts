@@ -20,6 +20,16 @@ const listRooms = makeFunctionReference<
     frozen: boolean
   }>
 >("rooms:list")
+const myRooms = makeFunctionReference<
+  "query",
+  { fixtureId: number },
+  Array<{
+    _id: Id<"rooms">
+    kind: "global" | "public" | "private"
+    name: string
+    frozen: boolean
+  }>
+>("rooms:mine")
 
 const createRoom = makeFunctionReference<
   "mutation",
@@ -38,7 +48,11 @@ const joinRoom = makeFunctionReference<
 >("rooms:join")
 const recordRoomReaction = makeFunctionReference<
   "mutation",
-  { roomId: Id<"rooms">; flashCardId: Id<"flashCards">; reaction: "cheer" | "wow" | "nervous" },
+  {
+    roomId: Id<"rooms">
+    flashCardId: Id<"flashCards">
+    reaction: "cheer" | "wow" | "nervous"
+  },
   { reactionId: Id<"roomReactions"> }
 >("rooms:recordReaction")
 const reactionSummary = makeFunctionReference<
@@ -135,6 +149,14 @@ test("an authenticated fan creates one public Room and begins its standings", as
   await expect(fan.query(standings, { roomId: room.roomId })).resolves.toEqual([
     { displayName: "Fan 1111", score: 0 },
   ])
+  await expect(fan.query(myRooms, { fixtureId: 42 })).resolves.toEqual([
+    expect.objectContaining({
+      _id: room.roomId,
+      kind: "public",
+      name: "Northshore fans",
+      frozen: false,
+    }),
+  ])
 })
 
 test("a Room member reacts to a fixture Flash Card without changing that shared record", async () => {
@@ -153,10 +175,18 @@ test("a Room member reacts to a fixture Flash Card without changing that shared 
     eventType: "yellow_card",
     raw: {
       ...fixtureCapture.raw,
-      Update: { Action: "yellow_card", Id: 2, Seq: 2, Confirmed: true, StatusId: 4 },
+      Update: {
+        Action: "yellow_card",
+        Id: 2,
+        Seq: 2,
+        Confirmed: true,
+        StatusId: 4,
+      },
     },
   })
-  const [flashCard] = await t.query(api.fixture_timeline.list, { fixtureId: 42 })
+  const [flashCard] = await t.query(api.fixture_timeline.list, {
+    fixtureId: 42,
+  })
   expect(flashCard).toMatchObject({ type: "card", retracted: false })
 
   const host = t.withIdentity({
@@ -180,9 +210,14 @@ test("a Room member reacts to a fixture Flash Card without changing that shared 
   })
 
   await expect(
-    t.query(reactionSummary, { roomId: room.roomId, flashCardId: flashCard._id })
+    t.query(reactionSummary, {
+      roomId: room.roomId,
+      flashCardId: flashCard._id,
+    })
   ).resolves.toEqual({ cheer: 1, wow: 0, nervous: 0 })
-  await expect(t.query(api.fixture_timeline.list, { fixtureId: 42 })).resolves.toEqual([
+  await expect(
+    t.query(api.fixture_timeline.list, { fixtureId: 42 })
+  ).resolves.toEqual([
     expect.objectContaining({ _id: flashCard._id, retracted: false }),
   ])
 })
@@ -248,12 +283,18 @@ test("final fixtures make every Room read-only and reject new social Rooms", asy
   })
 
   await expect(t.query(listRooms, { fixtureId: 42 })).resolves.toEqual(
-    expect.arrayContaining([expect.objectContaining({ _id: room.roomId, frozen: true })])
-  )
-  await expect(guest.mutation(joinRoom, { roomId: room.roomId })).rejects.toThrow(
-    "read-only"
+    expect.arrayContaining([
+      expect.objectContaining({ _id: room.roomId, frozen: true }),
+    ])
   )
   await expect(
-    host.mutation(createRoom, { fixtureId: 42, kind: "private", name: "Final whistle" })
+    guest.mutation(joinRoom, { roomId: room.roomId })
+  ).rejects.toThrow("read-only")
+  await expect(
+    host.mutation(createRoom, {
+      fixtureId: 42,
+      kind: "private",
+      name: "Final whistle",
+    })
   ).rejects.toThrow("cannot be created")
 })

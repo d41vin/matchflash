@@ -7,6 +7,8 @@ import { useState } from "react"
 import { useMatchFlashAuth } from "@/components/auth/matchflash-providers"
 import type { Id } from "@/convex/_generated/dataModel"
 
+import { RoomChat } from "./room-chat"
+
 const listRooms = makeFunctionReference<
   "query",
   { fixtureId: number },
@@ -22,7 +24,21 @@ const createRoom = makeFunctionReference<
   { fixtureId: number; kind: "public" | "private"; name: string },
   { roomId: Id<"rooms"> }
 >("rooms:create")
-const joinRoom = makeFunctionReference<"mutation", { roomId: Id<"rooms"> }, null>("rooms:join")
+const myRooms = makeFunctionReference<
+  "query",
+  { fixtureId: number },
+  Array<{
+    _id: Id<"rooms">
+    kind: "global" | "public" | "private"
+    name: string
+    frozen: boolean
+  }>
+>("rooms:mine")
+const joinRoom = makeFunctionReference<
+  "mutation",
+  { roomId: Id<"rooms"> },
+  null
+>("rooms:join")
 const matchStandings = makeFunctionReference<
   "query",
   { fixtureId: number },
@@ -40,7 +56,11 @@ const fixtureTimeline = makeFunctionReference<
 >("fixture_timeline:list")
 const recordReaction = makeFunctionReference<
   "mutation",
-  { roomId: Id<"rooms">; flashCardId: Id<"flashCards">; reaction: "cheer" | "wow" | "nervous" },
+  {
+    roomId: Id<"rooms">
+    flashCardId: Id<"flashCards">
+    reaction: "cheer" | "wow" | "nervous"
+  },
   { reactionId: Id<"roomReactions"> }
 >("rooms:recordReaction")
 
@@ -48,10 +68,15 @@ export function SocialRooms({ fixtureId }: { fixtureId: number }) {
   const { isAuthenticated, isLoading, requestSignIn } = useMatchFlashAuth()
   const [activeRoomId, setActiveRoomId] = useState<Id<"rooms"> | null>(null)
   const rooms = useQuery(listRooms, { fixtureId })
+  const memberRooms = useQuery(
+    myRooms,
+    isAuthenticated ? { fixtureId } : "skip"
+  )
   const standings = useQuery(matchStandings, { fixtureId })
+  const selectedRoomId = activeRoomId ?? memberRooms?.[0]?._id ?? null
   const activeRoomStandings = useQuery(
     roomStandings,
-    activeRoomId ? { roomId: activeRoomId } : "skip"
+    selectedRoomId ? { roomId: selectedRoomId } : "skip"
   )
   const flashCards = useQuery(fixtureTimeline, { fixtureId })
   const create = useMutation(createRoom)
@@ -81,7 +106,9 @@ export function SocialRooms({ fixtureId }: { fixtureId: number }) {
       setName("")
       setStatus(`${kind === "public" ? "Public" : "Private"} Room created.`)
     } catch (cause) {
-      setStatus(cause instanceof Error ? cause.message : "Could not create the Room.")
+      setStatus(
+        cause instanceof Error ? cause.message : "Could not create the Room."
+      )
     } finally {
       setIsSaving(false)
     }
@@ -96,21 +123,30 @@ export function SocialRooms({ fixtureId }: { fixtureId: number }) {
       setActiveRoomId(roomId)
       setStatus("Joined Room. Room reactions and standings are now available.")
     } catch (cause) {
-      setStatus(cause instanceof Error ? cause.message : "Could not join the Room.")
+      setStatus(
+        cause instanceof Error ? cause.message : "Could not join the Room."
+      )
     } finally {
       setIsSaving(false)
     }
   }
 
-  async function reactToFlash(flashCardId: Id<"flashCards">, reaction: "cheer" | "wow" | "nervous") {
-    if (!activeRoomId || !(await requireAuth())) return
+  async function reactToFlash(
+    flashCardId: Id<"flashCards">,
+    reaction: "cheer" | "wow" | "nervous"
+  ) {
+    if (!selectedRoomId || !(await requireAuth())) return
     setIsSaving(true)
     setStatus(null)
     try {
-      await react({ roomId: activeRoomId, flashCardId, reaction })
+      await react({ roomId: selectedRoomId, flashCardId, reaction })
       setStatus("Room reaction recorded.")
     } catch (cause) {
-      setStatus(cause instanceof Error ? cause.message : "Could not record that reaction.")
+      setStatus(
+        cause instanceof Error
+          ? cause.message
+          : "Could not record that reaction."
+      )
     } finally {
       setIsSaving(false)
     }
@@ -120,13 +156,15 @@ export function SocialRooms({ fixtureId }: { fixtureId: number }) {
     <section className="mt-5 rounded-3xl border border-violet-300/20 bg-violet-300/5 p-5 sm:p-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <p className="text-xs font-semibold tracking-[0.16em] text-violet-200">SOCIAL ROOMS</p>
+          <p className="text-xs font-semibold tracking-[0.16em] text-violet-200">
+            SOCIAL ROOMS
+          </p>
           <h2 className="mt-2 text-xl font-bold text-white">
             {frozen ? "View Rooms" : "Watch with your people"}
           </h2>
           <p className="mt-2 max-w-prose text-sm leading-6 text-slate-300">
-            The global Match Room stays open to everyone. Public and private Rooms are
-            optional social spaces with their own standings.
+            The global Match Room stays open to everyone. Public and private
+            Rooms are optional social spaces with their own standings.
           </p>
         </div>
         {frozen ? (
@@ -142,14 +180,23 @@ export function SocialRooms({ fixtureId }: { fixtureId: number }) {
           {standings?.length ? (
             <ol className="mt-3 space-y-2 text-sm text-slate-200">
               {standings.slice(0, 5).map((standing, index) => (
-                <li className="flex justify-between" key={`${standing.displayName}-${index}`}>
-                  <span>{index + 1}. {standing.displayName}</span>
-                  <span className="font-mono text-violet-200">{standing.score}</span>
+                <li
+                  className="flex justify-between"
+                  key={`${standing.displayName}-${index}`}
+                >
+                  <span>
+                    {index + 1}. {standing.displayName}
+                  </span>
+                  <span className="font-mono text-violet-200">
+                    {standing.score}
+                  </span>
                 </li>
               ))}
             </ol>
           ) : (
-            <p className="mt-3 text-sm text-slate-400">Join a social Room to appear here.</p>
+            <p className="mt-3 text-sm text-slate-400">
+              Join a social Room to appear here.
+            </p>
           )}
         </div>
 
@@ -158,8 +205,13 @@ export function SocialRooms({ fixtureId }: { fixtureId: number }) {
           {publicRooms.length ? (
             <ul className="mt-3 space-y-3">
               {publicRooms.map((room) => (
-                <li className="flex items-center justify-between gap-3 text-sm" key={room._id}>
-                  <span className="font-medium text-slate-200">{room.name}</span>
+                <li
+                  className="flex items-center justify-between gap-3 text-sm"
+                  key={room._id}
+                >
+                  <span className="font-medium text-slate-200">
+                    {room.name}
+                  </span>
                   <button
                     className="rounded-full border border-violet-200/30 px-3 py-1.5 font-semibold text-violet-100 disabled:opacity-50"
                     disabled={frozen || isLoading || isSaving}
@@ -176,6 +228,24 @@ export function SocialRooms({ fixtureId }: { fixtureId: number }) {
           )}
         </div>
       </div>
+
+      {memberRooms?.length ? (
+        <div className="mt-5 rounded-2xl bg-slate-950/65 p-4">
+          <h3 className="font-semibold text-white">Your Rooms</h3>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {memberRooms.map((room) => (
+              <button
+                className="rounded-full border border-cyan-200/30 px-3 py-1.5 text-sm font-semibold text-cyan-100 hover:bg-cyan-200/10"
+                key={room._id}
+                onClick={() => setActiveRoomId(room._id)}
+                type="button"
+              >
+                {room.name}
+              </button>
+            ))}
+          </div>
+        </div>
+      ) : null}
 
       {!frozen ? (
         <form
@@ -195,7 +265,9 @@ export function SocialRooms({ fixtureId }: { fixtureId: number }) {
           />
           <select
             className="rounded-xl border border-white/10 bg-slate-900 px-3 py-2 text-sm text-white"
-            onChange={(event) => setKind(event.target.value as "public" | "private")}
+            onChange={(event) =>
+              setKind(event.target.value as "public" | "private")
+            }
             value={kind}
           >
             <option value="public">Public</option>
@@ -210,46 +282,73 @@ export function SocialRooms({ fixtureId }: { fixtureId: number }) {
           </button>
         </form>
       ) : null}
-      {activeRoomId && !frozen ? (
+      {selectedRoomId ? (
         <div className="mt-5 rounded-2xl border border-white/10 bg-slate-950/65 p-4">
           <h3 className="font-semibold text-white">Room standings</h3>
           {activeRoomStandings?.length ? (
             <ol className="mt-3 space-y-2 text-sm text-slate-200">
               {activeRoomStandings.slice(0, 5).map((standing, index) => (
-                <li className="flex justify-between" key={`${standing.displayName}-${index}`}>
-                  <span>{index + 1}. {standing.displayName}</span>
-                  <span className="font-mono text-violet-200">{standing.score}</span>
+                <li
+                  className="flex justify-between"
+                  key={`${standing.displayName}-${index}`}
+                >
+                  <span>
+                    {index + 1}. {standing.displayName}
+                  </span>
+                  <span className="font-mono text-violet-200">
+                    {standing.score}
+                  </span>
                 </li>
               ))}
             </ol>
           ) : (
             <p className="mt-3 text-sm text-slate-400">No Room members yet.</p>
           )}
-          <h3 className="mt-5 font-semibold text-white">React in this Room</h3>
-          <p className="mt-1 text-sm text-slate-400">These reactions belong only to your selected social Room.</p>
-          <ul className="mt-3 space-y-3">
-            {flashCards?.slice(0, 3).map((card) => (
-              <li className="flex flex-wrap items-center justify-between gap-3" key={card._id}>
-                <span className="text-sm text-slate-200">{card.title}</span>
-                <span className="flex gap-2">
-                  {(["cheer", "wow", "nervous"] as const).map((reaction) => (
-                    <button
-                      className="rounded-full border border-white/15 px-3 py-1 text-xs font-semibold text-slate-100 disabled:opacity-50"
-                      disabled={isSaving || isLoading}
-                      key={reaction}
-                      onClick={() => void reactToFlash(card._id, reaction)}
-                      type="button"
-                    >
-                      {reaction}
-                    </button>
-                  ))}
-                </span>
-              </li>
-            ))}
-          </ul>
+          {!frozen ? (
+            <>
+              <h3 className="mt-5 font-semibold text-white">
+                React in this Room
+              </h3>
+              <p className="mt-1 text-sm text-slate-400">
+                These reactions belong only to your selected social Room.
+              </p>
+              <ul className="mt-3 space-y-3">
+                {flashCards?.slice(0, 3).map((card) => (
+                  <li
+                    className="flex flex-wrap items-center justify-between gap-3"
+                    key={card._id}
+                  >
+                    <span className="text-sm text-slate-200">{card.title}</span>
+                    <span className="flex gap-2">
+                      {(["cheer", "wow", "nervous"] as const).map(
+                        (reaction) => (
+                          <button
+                            className="rounded-full border border-white/15 px-3 py-1 text-xs font-semibold text-slate-100 disabled:opacity-50"
+                            disabled={isSaving || isLoading}
+                            key={reaction}
+                            onClick={() =>
+                              void reactToFlash(card._id, reaction)
+                            }
+                            type="button"
+                          >
+                            {reaction}
+                          </button>
+                        )
+                      )}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </>
+          ) : null}
+          <RoomChat readOnly={frozen} roomId={selectedRoomId} />
         </div>
       ) : null}
-      {status ? <p aria-live="polite" className="mt-3 text-sm text-violet-100">{status}</p> : null}
+      {status ? (
+        <p aria-live="polite" className="mt-3 text-sm text-violet-100">
+          {status}
+        </p>
+      ) : null}
     </section>
   )
 }

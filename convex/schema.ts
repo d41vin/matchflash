@@ -229,6 +229,19 @@ export const schema = defineSchema({
     .index("by_roomId_and_score", ["roomId", "score"])
     .index("by_fixtureId_and_userId", ["fixtureId", "userId"]),
 
+  chatMessages: defineTable({
+    roomId: v.id("rooms"),
+    userId: v.id("users"),
+    body: v.string(),
+    createdAt: v.number(),
+  })
+    .index("by_roomId_and_createdAt", ["roomId", "createdAt"])
+    .index("by_roomId_and_userId_and_createdAt", [
+      "roomId",
+      "userId",
+      "createdAt",
+    ]),
+
   roomReactions: defineTable({
     fixtureId: v.number(),
     flashCardId: v.id("flashCards"),

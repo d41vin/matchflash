@@ -1,4 +1,7 @@
-import type { GenericDatabaseReader, GenericDatabaseWriter } from "convex/server"
+import type {
+  GenericDatabaseReader,
+  GenericDatabaseWriter,
+} from "convex/server"
 import { v } from "convex/values"
 
 import {
@@ -95,7 +98,8 @@ async function requirePrivateRoomMembership(
         )
         .unique()
     : null
-  if (!membership) throw new Error("Join this private Room to view its standings.")
+  if (!membership)
+    throw new Error("Join this private Room to view its standings.")
 }
 
 async function requireActiveRoom(
@@ -123,7 +127,8 @@ export async function ensureGlobalRoom(
     )
     .unique()
   if (existing) {
-    if (frozen && !existing.frozen) await db.patch(existing._id, { frozen: true })
+    if (frozen && !existing.frozen)
+      await db.patch(existing._id, { frozen: true })
     return existing._id
   }
   return await db.insert("rooms", {
@@ -141,24 +146,71 @@ export const list = query({
     const db = reader(ctx)
     const fixtureState = await db
       .query("fixtureStates")
-      .withIndex("by_fixtureId", (query) => query.eq("fixtureId", args.fixtureId))
+      .withIndex("by_fixtureId", (query) =>
+        query.eq("fixtureId", args.fixtureId)
+      )
       .unique()
     const fixtureFrozen = fixtureState?.phase === "final"
     const rooms = await db
       .query("rooms")
-      .withIndex("by_fixtureId", (query) => query.eq("fixtureId", args.fixtureId))
+      .withIndex("by_fixtureId", (query) =>
+        query.eq("fixtureId", args.fixtureId)
+      )
       .order("asc")
       .take(100)
 
     return rooms
       .filter((room) => room.kind !== "private")
       .map((room) => ({
-      _id: room._id,
-      fixtureId: room.fixtureId,
-      kind: room.kind,
-      name: room.name,
-      frozen: room.frozen || fixtureFrozen,
+        _id: room._id,
+        fixtureId: room.fixtureId,
+        kind: room.kind,
+        name: room.name,
+        frozen: room.frozen || fixtureFrozen,
       }))
+  },
+})
+
+export const mine = query({
+  args: { fixtureId: v.number() },
+  handler: async (ctx, args) => {
+    const db = reader(ctx)
+    const identity = await ctx.auth.getUserIdentity()
+    if (!identity) return []
+
+    const user = await db
+      .query("users")
+      .withIndex("by_tokenIdentifier", (query) =>
+        query.eq("tokenIdentifier", identity.tokenIdentifier)
+      )
+      .unique()
+    if (!user) return []
+
+    const fixtureState = await db
+      .query("fixtureStates")
+      .withIndex("by_fixtureId", (query) =>
+        query.eq("fixtureId", args.fixtureId)
+      )
+      .unique()
+    const memberships = await db
+      .query("roomMembers")
+      .withIndex("by_fixtureId_and_userId", (query) =>
+        query.eq("fixtureId", args.fixtureId).eq("userId", user._id)
+      )
+      .take(10)
+    const rooms = []
+    for (const membership of memberships) {
+      const room = await db.get("rooms", membership.roomId)
+      if (room && room.kind !== "global") {
+        rooms.push({
+          _id: room._id,
+          kind: room.kind,
+          name: room.name,
+          frozen: room.frozen || fixtureState?.phase === "final",
+        })
+      }
+    }
+    return rooms
   },
 })
 
@@ -172,12 +224,16 @@ export const create = mutation({
     const db = database(ctx)
     const name = args.name.trim()
     if (name.length === 0 || name.length > ROOM_NAME_MAX_LENGTH) {
-      throw new Error(`Room names must be 1 to ${ROOM_NAME_MAX_LENGTH} characters.`)
+      throw new Error(
+        `Room names must be 1 to ${ROOM_NAME_MAX_LENGTH} characters.`
+      )
     }
 
     const fixture = await db
       .query("fixtures")
-      .withIndex("by_fixtureId", (query) => query.eq("fixtureId", args.fixtureId))
+      .withIndex("by_fixtureId", (query) =>
+        query.eq("fixtureId", args.fixtureId)
+      )
       .unique()
     if (!fixture) throw new Error("Fixture not found.")
     if (await fixtureIsFrozen(db, args.fixtureId)) {
@@ -194,7 +250,9 @@ export const create = mutation({
     for (const membership of memberships) {
       const room = await db.get("rooms", membership.roomId)
       if (room?.kind === args.kind) {
-        throw new Error(`You already have an active ${args.kind} Room for this fixture.`)
+        throw new Error(
+          `You already have an active ${args.kind} Room for this fixture.`
+        )
       }
     }
 
@@ -245,7 +303,9 @@ export const join = mutation({
     for (const membership of memberships) {
       const joinedRoom = await db.get("rooms", membership.roomId)
       if (joinedRoom?.kind === "public") {
-        throw new Error("You already have an active public Room for this fixture.")
+        throw new Error(
+          "You already have an active public Room for this fixture."
+        )
       }
     }
 
@@ -355,11 +415,16 @@ export const matchStandings = query({
       if (existing) {
         existing.score += membership.score
       } else {
-        totals.set(user._id, { displayName: user.displayName, score: membership.score })
+        totals.set(user._id, {
+          displayName: user.displayName,
+          score: membership.score,
+        })
       }
     }
     return [...totals.values()].sort(
-      (left, right) => right.score - left.score || left.displayName.localeCompare(right.displayName)
+      (left, right) =>
+        right.score - left.score ||
+        left.displayName.localeCompare(right.displayName)
     )
   },
 })
@@ -374,13 +439,16 @@ export const standings = query({
 
     const memberships = await db
       .query("roomMembers")
-      .withIndex("by_roomId_and_score", (query) => query.eq("roomId", args.roomId))
+      .withIndex("by_roomId_and_score", (query) =>
+        query.eq("roomId", args.roomId)
+      )
       .order("desc")
       .take(100)
     const rows = []
     for (const membership of memberships) {
       const user = await db.get("users", membership.userId)
-      if (user) rows.push({ displayName: user.displayName, score: membership.score })
+      if (user)
+        rows.push({ displayName: user.displayName, score: membership.score })
     }
     return rows
   },
