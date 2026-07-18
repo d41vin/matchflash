@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 
+import { txlineDevnetActivationError } from "@/lib/txline-devnet-activation-error"
+
 const DEVNET_ACTIVATION_URL = "https://txline-dev.txodds.com/api/token/activate"
 
 type ActivationRequest = {
@@ -53,7 +55,7 @@ export async function POST(request: NextRequest) {
 
   if (!upstream.ok) {
     return NextResponse.json(
-      { error: "TxLINE Devnet activation failed. Check the transaction and wallet match." },
+      { error: txlineDevnetActivationError(upstream.status, payload) },
       { status: 502, headers: { "Cache-Control": "no-store" } }
     )
   }
