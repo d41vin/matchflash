@@ -8,13 +8,25 @@
  * @module
  */
 
+import type * as fixture_phase from "../fixture_phase.js";
+import type * as http from "../http.js";
+import type * as ingestion from "../ingestion.js";
+import type * as participation from "../participation.js";
+import type * as participation_rules from "../participation_rules.js";
+
 import type {
   ApiFromModules,
   FilterApi,
   FunctionReference,
-} from "convex/server"
+} from "convex/server";
 
-declare const fullApi: ApiFromModules<{}>
+declare const fullApi: ApiFromModules<{
+  fixture_phase: typeof fixture_phase;
+  http: typeof http;
+  ingestion: typeof ingestion;
+  participation: typeof participation;
+  participation_rules: typeof participation_rules;
+}>;
 
 /**
  * A utility for referencing Convex functions in your app's public API.
@@ -27,7 +39,7 @@ declare const fullApi: ApiFromModules<{}>
 export declare const api: FilterApi<
   typeof fullApi,
   FunctionReference<any, "public">
->
+>;
 
 /**
  * A utility for referencing Convex functions in your app's internal API.
@@ -40,6 +52,6 @@ export declare const api: FilterApi<
 export declare const internal: FilterApi<
   typeof fullApi,
   FunctionReference<any, "internal">
->
+>;
 
-export declare const components: {}
+export declare const components: {};
