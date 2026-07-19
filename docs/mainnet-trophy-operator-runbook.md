@@ -3,8 +3,8 @@
 This runbook provisions the first non-public Bubblegum V2 Digital Trophy tree.
 It is deliberately a two-command process: the first command is read-only and
 does not sign or submit a transaction; the second can submit Mainnet
-transactions only after an explicit approval value and operator secret are
-provided.
+transactions only after an explicit approval value is provided by an
+authenticated Convex CLI session.
 
 Do not reuse a Devnet address, keypair, rent observation, collection, or tree
 address. Do not enter a seed phrase anywhere in this workflow.
