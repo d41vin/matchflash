@@ -363,7 +363,7 @@ export const schema = defineSchema({
   }).index("by_userId_and_fixtureId", ["userId", "fixtureId"]),
 
   // A tree is provisioned by an operator. Claiming only ever targets the one
-  // active, non-public Devnet tree and reserves a leaf before it schedules an
+  // active, non-public Mainnet tree and reserves a leaf before it schedules an
   // on-chain mint.
   merkleTrees: defineTable({
     treeAddress: v.string(),

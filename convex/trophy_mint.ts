@@ -1,5 +1,7 @@
 "use node"
 
+import { timingSafeEqual } from "node:crypto"
+
 import type { DasApiInterface } from "@metaplex-foundation/digital-asset-standard-api"
 import {
   createTreeV2,
@@ -9,10 +11,7 @@ import {
   mplBubblegum,
   setNonTransferableV2,
 } from "@metaplex-foundation/mpl-bubblegum"
-import {
-  createCollection,
-  mplCore,
-} from "@metaplex-foundation/mpl-core"
+import { createCollection, mplCore } from "@metaplex-foundation/mpl-core"
 import {
   generateSigner,
   keypairIdentity,
@@ -25,7 +24,16 @@ import { v } from "convex/values"
 
 import { internal } from "./_generated/api"
 import type { Doc } from "./_generated/dataModel"
-import { env, internalAction, type ActionCtx } from "./_generated/server"
+import {
+  action,
+  env,
+  internalAction,
+  type ActionCtx,
+} from "./_generated/server"
+import {
+  MAINNET_TROPHY_TREE_CONFIG,
+  mainnetTrophyTreePreflight,
+} from "./trophy_mainnet_preflight"
 
 type ClaimReservation = Doc<"trophyClaims"> & {
   fixture: Doc<"fixtures">
@@ -34,27 +42,46 @@ type ClaimReservation = Doc<"trophyClaims"> & {
 }
 type SecuringReservation = Doc<"trophyClaims"> & { mintAddress: string }
 
-const DEVNET_TREE_CONFIG = {
-  capacity: 32,
-  maxDepth: 5,
-  maxBufferSize: 8,
-  canopyDepth: 5,
-} as const
+const MAINNET_GENESIS_HASH = "5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp"
+const MAINNET_TREE_CREATION_APPROVAL = "CREATE_MAINNET_TROPHY_TREE"
 
 function serializableError(error: unknown) {
   if (error instanceof Error) return error.message.slice(0, 500)
-  return "The Devnet trophy mint could not be completed."
+  return "The Mainnet trophy mint could not be completed."
 }
 
-function devnetAuthority() {
-  if (env.MATCHFLASH_TROPHY_NETWORK !== "devnet") {
-    throw new Error("Digital Trophy minting is configured for Devnet only.")
+function mainnetUmi() {
+  if (env.MATCHFLASH_TROPHY_NETWORK !== "mainnet") {
+    throw new Error("Digital Trophy minting is configured for Mainnet only.")
   }
-  if (
-    !env.MATCHFLASH_TROPHY_RPC_URL ||
-    !env.MATCHFLASH_TROPHY_AUTHORITY_SECRET_KEY
-  ) {
-    throw new Error("The Devnet Digital Trophy mint is not configured.")
+  if (!env.MATCHFLASH_TROPHY_RPC_URL) {
+    throw new Error("The Mainnet Digital Trophy RPC is not configured.")
+  }
+
+  return createUmi(env.MATCHFLASH_TROPHY_RPC_URL)
+    .use(mplBubblegum())
+    .use(mplCore())
+}
+
+async function mainnetTreePreflight() {
+  const umi = mainnetUmi()
+  const accountSizeBytes = mainnetTrophyTreePreflight(0).accountSizeBytes
+  await assertMainnetRpc(umi)
+  const rentExemptLamports = await umi.rpc.getRent(accountSizeBytes)
+  return mainnetTrophyTreePreflight(rentExemptLamports.basisPoints)
+}
+
+async function assertMainnetRpc(umi: ReturnType<typeof mainnetUmi>) {
+  if ((await umi.rpc.getGenesisHash()) !== MAINNET_GENESIS_HASH) {
+    throw new Error(
+      "MATCHFLASH_TROPHY_RPC_URL must target Solana Mainnet before a trophy transaction can be submitted."
+    )
+  }
+}
+
+function mainnetAuthority() {
+  if (!env.MATCHFLASH_TROPHY_AUTHORITY_SECRET_KEY) {
+    throw new Error("The Mainnet Digital Trophy authority is not configured.")
   }
 
   let secretKey: unknown
@@ -67,7 +94,7 @@ function devnetAuthority() {
       )
     } catch {
       throw new Error(
-        "The Devnet trophy authority key must be a 64-byte JSON array or Phantom base58 private key."
+        "The Mainnet trophy authority key must be a 64-byte JSON array or Phantom base58 private key."
       )
     }
   }
@@ -77,22 +104,23 @@ function devnetAuthority() {
     secretKey.length !== 64 ||
     secretKey.some((byte) => !Number.isInteger(byte) || byte < 0 || byte > 255)
   ) {
-    throw new Error("The Devnet trophy authority key must contain 64 bytes.")
+    throw new Error("The Mainnet trophy authority key must contain 64 bytes.")
   }
 
-  const umi = createUmi(env.MATCHFLASH_TROPHY_RPC_URL)
-    .use(mplBubblegum())
-    .use(mplCore())
+  const umi = mainnetUmi()
   const keypair = umi.eddsa.createKeypairFromSecretKey(
     new Uint8Array(secretKey)
   )
   return umi.use(keypairIdentity(keypair))
 }
 
-function dasCompatibleUmi(umi: ReturnType<typeof devnetAuthority>) {
+function dasCompatibleUmi(umi: ReturnType<typeof mainnetAuthority>) {
   // DAS uses named JSON-RPC params, whereas Umi's Web3.js RPC bridge emits
   // positional arrays. Keep the two DAS reads at this narrow boundary.
-  async function dasRequest<T>(method: string, params: Record<string, unknown>) {
+  async function dasRequest<T>(
+    method: string,
+    params: Record<string, unknown>
+  ) {
     const response = await fetch(umi.rpc.getEndpoint(), {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -111,9 +139,7 @@ function dasCompatibleUmi(umi: ReturnType<typeof devnetAuthority>) {
   const dasRpc: DasApiInterface = {
     getAsset: async (input) => {
       const assetId =
-        typeof input === "object" && "assetId" in input
-          ? input.assetId
-          : input
+        typeof input === "object" && "assetId" in input ? input.assetId : input
       const displayOptions =
         typeof input === "object" && "displayOptions" in input
           ? input.displayOptions
@@ -141,27 +167,64 @@ function collectionMetadata() {
   })
 }
 
-export const provisionDevnetTree = internalAction({
+export const preflightMainnetTree = action({
   args: {},
-  handler: async (ctx): Promise<null> => {
+  handler: async () => {
+    const preflight = await mainnetTreePreflight()
+    console.log("Mainnet Digital Trophy tree preflight", preflight)
+    return preflight
+  },
+})
+
+function requireMainnetTreeOperator(
+  operatorSecret: string,
+  approval: typeof MAINNET_TREE_CREATION_APPROVAL
+) {
+  const expectedSecret = env.MATCHFLASH_TROPHY_OPERATOR_SECRET
+  if (!expectedSecret) {
+    throw new Error("The Mainnet tree operator secret is not configured.")
+  }
+  const expected = Buffer.from(expectedSecret)
+  const provided = Buffer.from(operatorSecret)
+  if (
+    expected.length !== provided.length ||
+    !timingSafeEqual(expected, provided) ||
+    approval !== MAINNET_TREE_CREATION_APPROVAL
+  ) {
+    throw new Error("Explicit Mainnet tree-creation approval is required.")
+  }
+}
+
+export const provisionMainnetTree = action({
+  args: {
+    operatorSecret: v.string(),
+    approval: v.literal(MAINNET_TREE_CREATION_APPROVAL),
+  },
+  handler: async (ctx, args) => {
+    requireMainnetTreeOperator(args.operatorSecret, args.approval)
     const activeTree: Doc<"merkleTrees"> | null = await ctx.runQuery(
       internal.trophies.getActiveTree,
       {}
     )
-    if (activeTree) return null
+    if (activeTree) {
+      throw new Error(
+        "An active Digital Trophy tree already exists; do not create another tree automatically."
+      )
+    }
+
+    const preflight = await mainnetTreePreflight()
+    console.log("Approved Mainnet Digital Trophy tree creation", preflight)
+    const umi = mainnetAuthority()
 
     const metadataStorageId = await ctx.storage.store(
       new Blob([collectionMetadata()], { type: "application/json" })
     )
     const metadataUrl = await ctx.storage.getUrl(metadataStorageId)
     if (!metadataUrl)
-      throw new Error("Digital Trophy collection metadata could not be published.")
+      throw new Error(
+        "Digital Trophy collection metadata could not be published."
+      )
 
-    const umi = devnetAuthority()
-    // Bubblegum V2 calculates this same account size before creating the
-    // tree. We obtain the exact current rent first so the action result is an
-    // auditable Devnet preflight rather than a hidden spend.
-    const treeRentLamports = await umi.rpc.getRent(3864)
     const collection = generateSigner(umi)
     const merkleTree = generateSigner(umi)
 
@@ -183,27 +246,31 @@ export const provisionDevnetTree = internalAction({
     const treeTx = await (
       await createTreeV2(umi, {
         merkleTree,
-        maxDepth: DEVNET_TREE_CONFIG.maxDepth,
-        maxBufferSize: DEVNET_TREE_CONFIG.maxBufferSize,
-        canopyDepth: DEVNET_TREE_CONFIG.canopyDepth,
-        public: false,
+        maxDepth: MAINNET_TROPHY_TREE_CONFIG.maxDepth,
+        maxBufferSize: MAINNET_TROPHY_TREE_CONFIG.maxBufferSize,
+        canopyDepth: MAINNET_TROPHY_TREE_CONFIG.canopyDepth,
+        merkleTreeSize: preflight.accountSizeBytes,
+        public: MAINNET_TROPHY_TREE_CONFIG.public,
       })
     ).sendAndConfirm(umi)
 
-    await ctx.runMutation(
-      internal.trophies.registerDevnetTree,
-      {
+    await ctx.runMutation(internal.trophies.registerMainnetTree, {
       treeAddress: merkleTree.publicKey,
       collectionAddress: collection.publicKey,
-      capacity: DEVNET_TREE_CONFIG.capacity,
-      treeRentLamports: treeRentLamports.toString(),
-      collectionTransactionSignature: Buffer.from(collectionTx.signature).toString(
+      capacity: MAINNET_TROPHY_TREE_CONFIG.capacity,
+      treeRentLamports: preflight.rentExemptLamports,
+      collectionTransactionSignature: Buffer.from(
+        collectionTx.signature
+      ).toString("base64"),
+      treeTransactionSignature: Buffer.from(treeTx.signature).toString(
         "base64"
       ),
-      treeTransactionSignature: Buffer.from(treeTx.signature).toString("base64"),
-      }
-    )
-    return null
+    })
+    return {
+      ...preflight,
+      treeAddress: merkleTree.publicKey,
+      collectionAddress: collection.publicKey,
+    }
   },
 })
 
@@ -235,8 +302,8 @@ function trophyMetadata(reservation: ClaimReservation) {
 }
 
 async function secureMint(ctx: ActionCtx, claim: SecuringReservation) {
-  const umi = devnetAuthority()
-  const merkleTree = publicKey(claim.treeAddress)
+  const umi = mainnetAuthority()
+  await assertMainnetRpc(umi)
   const coreCollection = publicKey(claim.collectionAddress)
   const mintAddress = publicKey(claim.mintAddress)
   const dasEnabledUmi = dasCompatibleUmi(umi)
@@ -272,7 +339,8 @@ export const mintReserved = internalAction({
       if (!metadataUrl)
         throw new Error("Digital Trophy metadata could not be published.")
 
-      const umi = devnetAuthority()
+      const umi = mainnetAuthority()
+      await assertMainnetRpc(umi)
       const merkleTree = publicKey(reservation.treeAddress)
       const coreCollection = publicKey(reservation.collectionAddress)
       const leafOwner = publicKey(reservation.user.walletAddress)

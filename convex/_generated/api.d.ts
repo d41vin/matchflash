@@ -26,6 +26,7 @@ import type * as reliability from "../reliability.js";
 import type * as rooms from "../rooms.js";
 import type * as trophies from "../trophies.js";
 import type * as trophy_eligibility from "../trophy_eligibility.js";
+import type * as trophy_mainnet_preflight from "../trophy_mainnet_preflight.js";
 import type * as trophy_mint from "../trophy_mint.js";
 
 import type {
@@ -53,6 +54,7 @@ declare const fullApi: ApiFromModules<{
   rooms: typeof rooms;
   trophies: typeof trophies;
   trophy_eligibility: typeof trophy_eligibility;
+  trophy_mainnet_preflight: typeof trophy_mainnet_preflight;
   trophy_mint: typeof trophy_mint;
 }>;
 

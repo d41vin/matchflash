@@ -13,7 +13,7 @@ export const getActiveTree = internalQuery({
   },
 })
 
-export const registerDevnetTree = internalMutation({
+export const registerMainnetTree = internalMutation({
   args: {
     treeAddress: v.string(),
     collectionAddress: v.string(),
@@ -195,7 +195,12 @@ export const markSoulbound = internalMutation({
   handler: async (ctx, args) => {
     const claim = await ctx.db.get(args.claimId)
     if (!claim || claim.status !== "claimed") return
-    const { _id, _creationTime, failureMessage: _failureMessage, ...claimData } = claim
+    const {
+      _id,
+      _creationTime,
+      failureMessage: _failureMessage,
+      ...claimData
+    } = claim
     await ctx.db.replace(claim._id, {
       ...claimData,
       mintAddress: args.mintAddress,

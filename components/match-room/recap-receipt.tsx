@@ -155,8 +155,8 @@ export function RecapReceipt({ fixtureId }: { fixtureId: number }) {
               <>
                 <p className="mt-2 text-sm leading-6 text-slate-200">
                   {participant.eligibility.claimStatus === "failed"
-                    ? "Your earlier request did not reach Devnet. You can retry this free claim."
-                    : "Claim one free, non-transferable commemorative trophy on Solana Devnet. MatchFlash covers every cost."}
+                    ? "Your earlier request did not reach Mainnet. You can retry this free claim."
+                    : "Claim one free, non-transferable commemorative trophy on Solana Mainnet. MatchFlash covers every cost."}
                 </p>
                 <button
                   className="mt-4 inline-flex rounded-xl bg-cyan-300 px-4 py-2 text-sm font-bold text-slate-950 hover:bg-cyan-200 disabled:cursor-not-allowed disabled:opacity-60"
@@ -167,24 +167,24 @@ export function RecapReceipt({ fixtureId }: { fixtureId: number }) {
                   {isRequestingClaim
                     ? "Requesting trophy…"
                     : participant.eligibility.claimStatus === "failed"
-                      ? "Retry Devnet Digital Trophy"
-                      : "Claim Devnet Digital Trophy"}
+                      ? "Retry Mainnet Digital Trophy"
+                      : "Claim Mainnet Digital Trophy"}
                 </button>
               </>
             ) : null}
             {participant.eligibility.claimStatus === "minting" ? (
               <p className="mt-2 text-sm leading-6 text-slate-200">
-                Your sponsored Devnet mint is in progress. This page will
+                Your sponsored Mainnet mint is in progress. This page will
                 update when your trophy is claimed.
               </p>
             ) : null}
             {participant.eligibility.claimStatus === "claimed" ? (
               <p className="mt-2 text-sm leading-6 text-slate-200">
-                Your free Devnet trophy is claimed.{" "}
+                Your free Mainnet trophy is claimed.{" "}
                 {participant.trophy?.mintAddress ? (
                   <a
                     className="font-semibold text-cyan-200 hover:text-cyan-100"
-                    href={`https://explorer.solana.com/address/${participant.trophy.mintAddress}?cluster=devnet`}
+                    href={`https://explorer.solana.com/address/${participant.trophy.mintAddress}`}
                     rel="noreferrer"
                     target="_blank"
                   >

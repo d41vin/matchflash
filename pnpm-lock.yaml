@@ -14,6 +14,9 @@ importers:
       '@metaplex-foundation/digital-asset-standard-api':
         specifier: 2.0.0
         version: 2.0.0(@metaplex-foundation/umi@1.1.1)
+      '@metaplex-foundation/mpl-account-compression':
+        specifier: 0.0.1
+        version: 0.0.1(@metaplex-foundation/umi@1.1.1)
       '@metaplex-foundation/mpl-bubblegum':
         specifier: 5.0.2
         version: 5.0.2(@metaplex-foundation/umi@1.1.1)

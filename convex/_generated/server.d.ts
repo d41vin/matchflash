@@ -27,6 +27,7 @@ import type { DataModel } from "./dataModel.js";
 type Env = {
   readonly MATCHFLASH_TROPHY_AUTHORITY_SECRET_KEY: string | undefined;
   readonly MATCHFLASH_TROPHY_NETWORK: string | undefined;
+  readonly MATCHFLASH_TROPHY_OPERATOR_SECRET: string | undefined;
   readonly MATCHFLASH_TROPHY_RPC_URL: string | undefined;
   readonly MATCHFLASH_WORKER_SECRET: string;
 };
