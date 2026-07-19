@@ -22,12 +22,7 @@ import { v } from "convex/values"
 
 import { internal } from "./_generated/api"
 import type { Doc, Id } from "./_generated/dataModel"
-import {
-  action,
-  env,
-  internalAction,
-  type ActionCtx,
-} from "./_generated/server"
+import { env, internalAction, type ActionCtx } from "./_generated/server"
 import {
   MAINNET_TROPHY_TREE_CONFIG,
   mainnetTrophyTreePreflight,
@@ -72,6 +67,7 @@ async function mainnetTreePreflight() {
   const umi = mainnetUmi()
   const accountSizeBytes = mainnetTrophyTreePreflight(0).accountSizeBytes
   await assertMainnetRpc(umi)
+  await assertDasCapability(umi)
   const rentExemptLamports = await umi.rpc.getRent(accountSizeBytes)
   return mainnetTrophyTreePreflight(rentExemptLamports.basisPoints)
 }
@@ -82,6 +78,34 @@ async function assertMainnetRpc(umi: ReturnType<typeof mainnetUmi>) {
       "MATCHFLASH_TROPHY_RPC_URL must target Solana Mainnet before a trophy transaction can be submitted."
     )
   }
+}
+
+async function dasRequest<T>(
+  umi: ReturnType<typeof mainnetUmi>,
+  method: string,
+  params: Record<string, unknown>
+) {
+  const response = await fetch(umi.rpc.getEndpoint(), {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ jsonrpc: "2.0", id: method, method, params }),
+  })
+  const payload = (await response.json()) as {
+    result?: T
+    error?: { message?: string }
+  }
+  if (!response.ok || payload.error || payload.result === undefined) {
+    throw new Error(payload.error?.message ?? `DAS ${method} failed.`)
+  }
+  return payload.result
+}
+
+async function assertDasCapability(umi: ReturnType<typeof mainnetUmi>) {
+  await dasRequest(umi, "getAssetsByOwner", {
+    ownerAddress: "11111111111111111111111111111111",
+    page: 1,
+    limit: 1,
+  })
 }
 
 function mainnetAuthority() {
@@ -122,25 +146,6 @@ function mainnetAuthority() {
 function dasCompatibleUmi(umi: ReturnType<typeof mainnetAuthority>) {
   // DAS uses named JSON-RPC params, whereas Umi's Web3.js RPC bridge emits
   // positional arrays. Keep the two DAS reads at this narrow boundary.
-  async function dasRequest<T>(
-    method: string,
-    params: Record<string, unknown>
-  ) {
-    const response = await fetch(umi.rpc.getEndpoint(), {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ jsonrpc: "2.0", id: method, method, params }),
-    })
-    const payload = (await response.json()) as {
-      result?: T
-      error?: { message?: string }
-    }
-    if (!response.ok || payload.error || !payload.result) {
-      throw new Error(payload.error?.message ?? `DAS ${method} failed.`)
-    }
-    return payload.result
-  }
-
   const dasRpc: DasApiInterface = {
     getAsset: async (input) => {
       const assetId =
@@ -149,13 +154,13 @@ function dasCompatibleUmi(umi: ReturnType<typeof mainnetAuthority>) {
         typeof input === "object" && "displayOptions" in input
           ? input.displayOptions
           : {}
-      return await dasRequest("getAsset", {
+      return await dasRequest(umi, "getAsset", {
         id: assetId,
         options: displayOptions,
       })
     },
     getAssetProof: async (assetId) =>
-      await dasRequest("getAssetProof", { id: assetId }),
+      await dasRequest(umi, "getAssetProof", { id: assetId }),
   } as DasApiInterface
   return { ...umi, rpc: { ...umi.rpc, ...dasRpc } } as typeof umi & {
     rpc: DasApiInterface
@@ -172,7 +177,7 @@ function collectionMetadata() {
   })
 }
 
-export const preflightMainnetTree = action({
+export const preflightMainnetTree = internalAction({
   args: {},
   handler: async (
     ctx

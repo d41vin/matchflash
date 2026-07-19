@@ -28,12 +28,13 @@ Publish the function changes with the normal production deployment command;
 Run this command against production:
 
 ```powershell
-pnpm.cmd exec convex run trophy_mint:preflightMainnetTree '{}' --prod
+pnpm.cmd exec convex run internal.trophy_mint.preflightMainnetTree '{}' --prod
 ```
 
 It verifies that the configured RPC reports the Solana Mainnet genesis hash,
-calculates Bubblegum's account size for exactly this configuration, and asks
-that RPC for the current rent-exempt lamports:
+accepts a named-parameter DAS `getAssetsByOwner` request, calculates
+Bubblegum's account size for exactly this configuration, and asks that RPC for
+the current rent-exempt lamports:
 
 - `capacity: 32`
 - `maxDepth: 5`

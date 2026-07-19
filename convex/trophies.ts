@@ -1,15 +1,24 @@
 import { v } from "convex/values"
 
 import { internal } from "./_generated/api"
-import { internalMutation, internalQuery, mutation } from "./_generated/server"
+import {
+  internalMutation,
+  internalQuery,
+  mutation,
+  type QueryCtx,
+} from "./_generated/server"
+
+async function activeTree(db: QueryCtx["db"]) {
+  return await db
+    .query("merkleTrees")
+    .withIndex("by_isActive", (query) => query.eq("isActive", true))
+    .unique()
+}
 
 export const getActiveTree = internalQuery({
   args: {},
   handler: async (ctx) => {
-    return await ctx.db
-      .query("merkleTrees")
-      .withIndex("by_isActive", (query) => query.eq("isActive", true))
-      .unique()
+    return await activeTree(ctx.db)
   },
 })
 
@@ -80,11 +89,7 @@ export const reserveMainnetTreePreflight = internalMutation({
         "The Mainnet Digital Trophy preflight expired; run it again."
       )
     }
-    const activeTree = await ctx.db
-      .query("merkleTrees")
-      .withIndex("by_isActive", (query) => query.eq("isActive", true))
-      .unique()
-    if (activeTree) {
+    if (await activeTree(ctx.db)) {
       throw new Error(
         "An active Digital Trophy tree already exists; do not create another tree automatically."
       )
