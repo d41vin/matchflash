@@ -25,6 +25,7 @@ import type { Doc, Id } from "./_generated/dataModel"
 import { env, internalAction, type ActionCtx } from "./_generated/server"
 import {
   MAINNET_TROPHY_TREE_CONFIG,
+  isSolanaMainnetGenesisHash,
   mainnetTrophyTreePreflight,
 } from "./trophy_mainnet_preflight"
 
@@ -42,7 +43,6 @@ type ProvisionedMainnetTree = MainnetTreePreflight & {
   treeTransactionSignature: string
 }
 
-const MAINNET_GENESIS_HASH = "5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp"
 const MAINNET_TREE_CREATION_APPROVAL = "CREATE_MAINNET_TROPHY_TREE"
 
 function serializableError(error: unknown) {
@@ -73,7 +73,7 @@ async function mainnetTreePreflight() {
 }
 
 async function assertMainnetRpc(umi: ReturnType<typeof mainnetUmi>) {
-  if ((await umi.rpc.getGenesisHash()) !== MAINNET_GENESIS_HASH) {
+  if (!isSolanaMainnetGenesisHash(await umi.rpc.getGenesisHash())) {
     throw new Error(
       "MATCHFLASH_TROPHY_RPC_URL must target Solana Mainnet before a trophy transaction can be submitted."
     )
