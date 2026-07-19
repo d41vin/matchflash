@@ -250,11 +250,13 @@ export function reconcileFixtureEvent(
     return null
   }
 
-  const fixtureInfo = objectAt(raw, "FixtureInfo")
-  const update = objectAt(raw, "Update")
-  if (!update) {
-    return null
-  }
+  // The documented stream wraps an event in Update/FixtureInfo, while the
+  // live Mainnet stream also emits the same score actions as a flat envelope.
+  // Normalize both before deriving any fan-facing state.
+  const nestedUpdate = objectAt(raw, "Update")
+  const update = nestedUpdate ?? raw
+  const fixtureInfo = objectAt(raw, "FixtureInfo") ??
+    (nestedUpdate ? undefined : raw)
 
   const fixtureId =
     numberAt(update.FixtureId) ??

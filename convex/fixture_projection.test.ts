@@ -31,6 +31,66 @@ const confirmStablePriceRow = makeFunctionReference<
   { taxonomyId: string },
   null
 >("odds:confirmStablePriceRow")
+const syncFixtureSnapshot = makeFunctionReference<
+  "mutation",
+  {
+    fixtures: Array<{
+      fixtureId: number
+      competition: string
+      fixtureGroupId: number
+      participant1: string
+      participant2: string
+      startsAt: string
+    }>
+  },
+  { stored: number }
+>("ingestion:syncFixtureSnapshot")
+
+test("combines the worker-owned fixture snapshot with a flat score event for anonymous viewing", async () => {
+  const t = convexTest(schema, modules)
+
+  await t.mutation(syncFixtureSnapshot, {
+    fixtures: [
+      {
+        fixtureId: 42,
+        competition: "World Cup 2026",
+        fixtureGroupId: 9,
+        participant1: "Northshore",
+        participant2: "Southport",
+        startsAt: "2026-07-19T19:00:00.000Z",
+      },
+    ],
+  })
+  await t.mutation(internal.ingestion.captureRawEvent, {
+    source: "scores",
+    sourceEventId: "flat-score-19",
+    fixtureId: 42,
+    eventType: "yellow_card",
+    sequence: 19,
+    raw: {
+      FixtureId: 42,
+      Action: "yellow_card",
+      Id: 88,
+      Seq: 19,
+      StatusId: 4,
+      Score: {
+        Participant1: { Total: { Goals: 2 } },
+        Participant2: { Total: { Goals: 1 } },
+      },
+    },
+  })
+
+  expect(await t.query(api.fixture_projection.list, { now: Date.now() })).toMatchObject([
+    {
+      fixtureId: 42,
+      competition: "World Cup 2026",
+      stage: "Fixture group 9",
+      participant1: "Northshore",
+      participant2: "Southport",
+      match: { status: "live", score1: 2, score2: 1 },
+    },
+  ])
+})
 
 test("stores a score adjustment once and exposes only its safe fixture projection", async () => {
   const t = convexTest(schema, modules)

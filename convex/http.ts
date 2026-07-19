@@ -19,6 +19,21 @@ type WorkerApi = {
       { source: TxlineSource },
       string | null
     >
+    syncFixtureSnapshot: FunctionReference<
+      "mutation",
+      "internal",
+      {
+        fixtures: Array<{
+          fixtureId: number
+          competition: string
+          fixtureGroupId: number
+          participant1: string
+          participant2: string
+          startsAt: string
+        }>
+      },
+      { stored: number }
+    >
   }
   odds: {
     listTaxonomy: FunctionReference<
@@ -78,6 +93,40 @@ http.route({
       payload
     )
     return Response.json(result)
+  }),
+})
+
+http.route({
+  path: "/txline/fixtures/snapshot",
+  method: "POST",
+  handler: httpAction(async (ctx, request) => {
+    const unauthorized = workerSecret(request)
+    if (unauthorized) {
+      return unauthorized
+    }
+
+    let fixtures: unknown
+    try {
+      fixtures = ((await request.json()) as { fixtures?: unknown }).fixtures
+    } catch {
+      return new Response("Expected a JSON fixture snapshot.", { status: 400 })
+    }
+    if (!Array.isArray(fixtures)) {
+      return new Response("fixtures must be an array.", { status: 400 })
+    }
+
+    return Response.json(
+      await ctx.runMutation(workerApi.ingestion.syncFixtureSnapshot, {
+        fixtures: fixtures as Array<{
+          fixtureId: number
+          competition: string
+          fixtureGroupId: number
+          participant1: string
+          participant2: string
+          startsAt: string
+        }>,
+      })
+    )
   }),
 })
 

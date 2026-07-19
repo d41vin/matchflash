@@ -9,12 +9,10 @@ import {
   useSolana,
 } from "@phantom/react-sdk"
 import { ConvexProviderWithAuth, ConvexReactClient } from "convex/react"
-import { usePathname } from "next/navigation"
 import {
   createContext,
   useCallback,
   useContext,
-  useEffect,
   useMemo,
   useRef,
   useState,
@@ -30,6 +28,8 @@ type MatchFlashAuth = {
 }
 
 const MatchFlashAuthContext = createContext<MatchFlashAuth | null>(null)
+
+type WalletToken = { value: string; walletAddress: string }
 
 function toBase64Url(bytes: Uint8Array) {
   let binary = ""
@@ -52,12 +52,11 @@ async function readJson<T>(response: Response) {
 }
 
 function MatchFlashAuthProvider({ children }: PropsWithChildren) {
-  const pathname = usePathname()
   const { addresses, isConnected, isLoading: phantomIsLoading } = usePhantom()
   const { open } = useModal()
   const { solana, isAvailable } = useSolana()
-  const [token, setToken] = useState<string | null>(null)
-  const tokenRef = useRef<string | null>(null)
+  const [token, setToken] = useState<WalletToken | null>(null)
+  const tokenRef = useRef<WalletToken | null>(null)
   const [isAuthenticating, setIsAuthenticating] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -86,8 +85,9 @@ function MatchFlashAuthProvider({ children }: PropsWithChildren) {
         body: JSON.stringify({ signature: toBase64Url(signed.signature) }),
       })
       const completion = await readJson<{ token: string }>(completionResponse)
-      tokenRef.current = completion.token
-      setToken(completion.token)
+      const nextToken = { value: completion.token, walletAddress }
+      tokenRef.current = nextToken
+      setToken(nextToken)
     } catch (cause) {
       tokenRef.current = null
       setToken(null)
@@ -97,23 +97,6 @@ function MatchFlashAuthProvider({ children }: PropsWithChildren) {
       setIsAuthenticating(false)
     }
   }, [isAvailable, solana, walletAddress])
-
-  useEffect(() => {
-    if (!isConnected) {
-      tokenRef.current = null
-      setToken(null)
-      setError(null)
-      return
-    }
-
-    if (pathname.startsWith("/txline-")) {
-      return
-    }
-
-    if (walletAddress && !tokenRef.current && !isAuthenticating) {
-      void authenticate().catch(() => undefined)
-    }
-  }, [authenticate, isAuthenticating, isConnected, pathname, walletAddress])
 
   const requestSignIn = useCallback(async () => {
     if (!isConnected) {
@@ -128,20 +111,26 @@ function MatchFlashAuthProvider({ children }: PropsWithChildren) {
       if (forceRefreshToken) {
         await authenticate()
       }
-      return tokenRef.current
+      const currentToken = tokenRef.current
+      if (!currentToken || currentToken.walletAddress !== walletAddress) {
+        return null
+      }
+      return currentToken.value
     },
-    [authenticate]
+    [authenticate, walletAddress]
   )
+
+  const isAuthenticated = token?.walletAddress === walletAddress
 
   const value = useMemo<MatchFlashAuth>(
     () => ({
-      isAuthenticated: token !== null,
+      isAuthenticated,
       isLoading: phantomIsLoading || isAuthenticating,
       error,
       requestSignIn,
       fetchAccessToken,
     }),
-    [error, fetchAccessToken, isAuthenticating, phantomIsLoading, requestSignIn, token]
+    [error, fetchAccessToken, isAuthenticated, isAuthenticating, phantomIsLoading, requestSignIn]
   )
 
   return <MatchFlashAuthContext.Provider value={value}>{children}</MatchFlashAuthContext.Provider>

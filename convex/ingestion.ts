@@ -29,6 +29,24 @@ export type RawCaptureArgs = {
   raw: unknown
 }
 
+export type FixtureSnapshotEntry = {
+  fixtureId: number
+  competition: string
+  fixtureGroupId: number
+  participant1: string
+  participant2: string
+  startsAt: string
+}
+
+const fixtureSnapshotEntryValidator = v.object({
+  fixtureId: v.number(),
+  competition: v.string(),
+  fixtureGroupId: v.number(),
+  participant1: v.string(),
+  participant2: v.string(),
+  startsAt: v.string(),
+})
+
 function writer(ctx: MutationCtx): GenericDatabaseWriter<MatchFlashDataModel> {
   // Generated bindings are refreshed by `npx convex dev` after deployment.
   // Keep this pre-deploy schema boundary typed in the meantime.
@@ -102,6 +120,40 @@ export const captureRawEvent = internalMutation({
       )
     }
     return { stored: true }
+  },
+})
+
+// Fixture snapshots provide the immutable display metadata that the live
+// score stream intentionally omits. The operator-owned worker is the only
+// caller; browsers still receive only the safe fixture projection.
+export const syncFixtureSnapshot = internalMutation({
+  args: { fixtures: v.array(fixtureSnapshotEntryValidator) },
+  handler: async (ctx, args) => {
+    const db = writer(ctx)
+    for (const fixture of args.fixtures) {
+      const record = {
+        fixtureId: fixture.fixtureId,
+        sport: "soccer" as const,
+        competition: fixture.competition,
+        stage: `Fixture group ${fixture.fixtureGroupId}`,
+        participant1: fixture.participant1,
+        participant2: fixture.participant2,
+        startsAt: fixture.startsAt,
+      }
+      const existing = await db
+        .query("fixtures")
+        .withIndex("by_fixtureId", (query) =>
+          query.eq("fixtureId", fixture.fixtureId)
+        )
+        .unique()
+
+      if (existing) {
+        await db.patch(existing._id, record)
+      } else {
+        await db.insert("fixtures", record)
+      }
+    }
+    return { stored: args.fixtures.length }
   },
 })
 

@@ -20,9 +20,19 @@ type WorkerConfig = {
 
 type CaptureResult = { stored: boolean }
 
+type FixtureSnapshotEntry = {
+  fixtureId: number
+  competition: string
+  fixtureGroupId: number
+  participant1: string
+  participant2: string
+  startsAt: string
+}
+
 type IngestionClient = {
   capture(record: RawCaptureRecord): Promise<CaptureResult>
   getCheckpoint(source: TxlineSource): Promise<string | null>
+  syncFixtureSnapshot(fixtures: FixtureSnapshotEntry[]): Promise<{ stored: number }>
 }
 
 function requiredEnvironment(name: string): string {
@@ -104,6 +114,23 @@ function convexIngestionClient(config: WorkerConfig): IngestionClient {
       }
       return lastEventId ?? null
     },
+    async syncFixtureSnapshot(fixtures) {
+      const payload = await responseJson(
+        await fetch(`${config.convexSiteUrl}/txline/fixtures/snapshot`, {
+          method: "POST",
+          headers: { ...headers, "Content-Type": "application/json" },
+          body: JSON.stringify({ fixtures }),
+        })
+      )
+      if (
+        typeof payload !== "object" ||
+        payload === null ||
+        typeof (payload as { stored?: unknown }).stored !== "number"
+      ) {
+        throw new Error("Convex worker ingress returned an invalid snapshot response.")
+      }
+      return payload as { stored: number }
+    },
   }
 }
 
@@ -159,6 +186,69 @@ class TxlineCredentials {
 
 function streamUrl(apiOrigin: string, source: TxlineSource): string {
   return `${apiOrigin}/api/${source}/stream`
+}
+
+function isObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value)
+}
+
+function snapshotEntries(payload: unknown): FixtureSnapshotEntry[] {
+  if (!Array.isArray(payload)) {
+    throw new Error("TxLINE fixture snapshot was not an array.")
+  }
+
+  const fixtures: FixtureSnapshotEntry[] = []
+  for (const value of payload) {
+    if (!isObject(value)) continue
+    const fixtureId = value.FixtureId
+    const competition = value.Competition
+    const fixtureGroupId = value.FixtureGroupId
+    const participant1 = value.Participant1
+    const participant2 = value.Participant2
+    const startsAt = value.StartTime
+    if (
+      typeof fixtureId !== "number" ||
+      !Number.isFinite(fixtureId) ||
+      typeof competition !== "string" ||
+      typeof fixtureGroupId !== "number" ||
+      !Number.isFinite(fixtureGroupId) ||
+      typeof participant1 !== "string" ||
+      typeof participant2 !== "string" ||
+      typeof startsAt !== "string"
+    ) {
+      continue
+    }
+    fixtures.push({
+      fixtureId,
+      competition,
+      fixtureGroupId,
+      participant1,
+      participant2,
+      startsAt,
+    })
+  }
+
+  if (fixtures.length === 0) {
+    throw new Error("TxLINE fixture snapshot contained no usable fixtures.")
+  }
+  return fixtures
+}
+
+async function syncFixtureSnapshot(
+  config: WorkerConfig,
+  credentials: TxlineCredentials,
+  ingestion: IngestionClient
+) {
+  const response = await fetch(`${config.apiOrigin}/api/fixtures/snapshot`, {
+    headers: await credentials.headers(),
+  })
+  if (!response.ok) {
+    throw new Error(`TxLINE fixture snapshot failed with HTTP ${response.status}.`)
+  }
+  const outcome = await ingestion.syncFixtureSnapshot(
+    snapshotEntries(await response.json())
+  )
+  console.info(`[fixtures] synchronized ${outcome.stored} fixture records.`)
 }
 
 function reconnectDelay(attempt: number): number {
@@ -268,6 +358,12 @@ export async function runWorker(config = configFromEnvironment()) {
     config.guestJwt
   )
   const ingestion = convexIngestionClient(config)
+
+  try {
+    await syncFixtureSnapshot(config, credentials, ingestion)
+  } catch (error) {
+    console.error(`[fixtures] ${String(error)} Continuing with score and odds capture.`)
+  }
 
   console.info("Starting TxLINE Mainnet level-12 capture worker.")
   await Promise.all([

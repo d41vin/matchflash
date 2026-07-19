@@ -119,6 +119,9 @@ export async function reconcileCapturedScoreEvent(
       fixtureId = (fixtureInfo as Record<string, unknown>).FixtureId as
         number | undefined
     }
+    if (fixtureId === undefined) {
+      fixtureId = envelope.FixtureId as number | undefined
+    }
   }
 
   const existingState =

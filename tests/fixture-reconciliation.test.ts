@@ -67,6 +67,67 @@ test("projects an authoritative score adjustment and marks that period's stats s
   })
 })
 
+test("reconciles the flat score-stream envelope after fixture metadata is already known", () => {
+  const result = reconcileFixtureEvent(
+    {
+      fixture: {
+        fixtureId: 42,
+        competition: "World Cup 2026",
+        stage: "Fixture group 9",
+        participant1: "Northshore",
+        participant2: "Southport",
+        startsAt: "2026-07-19T19:00:00.000Z",
+      },
+      state: {
+        fixtureId: 42,
+        phase: "live",
+        score1: 1,
+        score2: 0,
+        reliability: {
+          cornersReliable: true,
+          cardsReliable: true,
+          dataSuspended: false,
+        },
+        updatedAt: 1,
+      },
+    },
+    {
+      FixtureId: 42,
+      Action: "yellow_card",
+      Id: 88,
+      Seq: 19,
+      StatusId: 4,
+      Score: {
+        Participant1: { Total: { Goals: 2 } },
+        Participant2: { Total: { Goals: 1 } },
+      },
+    },
+    2
+  )
+
+  assert.deepEqual(result?.state, {
+    fixtureId: 42,
+    phase: "live",
+    statusId: 4,
+    score1: 2,
+    score2: 1,
+    reliability: {
+      cornersReliable: true,
+      cardsReliable: true,
+      dataSuspended: false,
+    },
+    lastScoreSeq: 19,
+    updatedAt: 2,
+  })
+  assert.deepEqual(result?.action, {
+    fixtureId: 42,
+    actionId: 88,
+    action: "yellow_card",
+    sequence: 19,
+    discarded: false,
+  })
+})
+
 test("keeps the scoreboard stable for an amendment and applies the discard's authoritative score", () => {
   const current = {
     fixture: {
