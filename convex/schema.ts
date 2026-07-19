@@ -374,6 +374,16 @@ export const schema = defineSchema({
     createdAt: v.number(),
   }).index("by_isActive", ["isActive"]),
 
+  // A Mainnet tree quote is recorded before the separate creation command can
+  // consume it. This binds an operator approval to the displayed live rent.
+  trophyTreePreflights: defineTable({
+    accountSizeBytes: v.number(),
+    rentExemptLamports: v.string(),
+    createdAt: v.number(),
+    expiresAt: v.number(),
+    consumedAt: v.optional(v.number()),
+  }),
+
   // The `(userId, fixtureId)` lookup is the transactional anti-double-claim
   // guard. A record is written before any non-transactional chain work starts.
   trophyClaims: defineTable({

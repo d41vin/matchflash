@@ -49,6 +49,51 @@ export const registerMainnetTree = internalMutation({
   },
 })
 
+export const createMainnetTreePreflight = internalMutation({
+  args: { accountSizeBytes: v.number(), rentExemptLamports: v.string() },
+  handler: async (ctx, args) => {
+    const createdAt = Date.now()
+    return await ctx.db.insert("trophyTreePreflights", {
+      ...args,
+      createdAt,
+      expiresAt: createdAt + 5 * 60_000,
+    })
+  },
+})
+
+export const getMainnetTreePreflight = internalQuery({
+  args: { preflightId: v.id("trophyTreePreflights") },
+  handler: async (ctx, args) => {
+    return await ctx.db.get(args.preflightId)
+  },
+})
+
+export const reserveMainnetTreePreflight = internalMutation({
+  args: { preflightId: v.id("trophyTreePreflights") },
+  handler: async (ctx, args) => {
+    const preflight = await ctx.db.get(args.preflightId)
+    if (!preflight || preflight.consumedAt) {
+      throw new Error("Run a new Mainnet Digital Trophy preflight first.")
+    }
+    if (preflight.expiresAt < Date.now()) {
+      throw new Error(
+        "The Mainnet Digital Trophy preflight expired; run it again."
+      )
+    }
+    const activeTree = await ctx.db
+      .query("merkleTrees")
+      .withIndex("by_isActive", (query) => query.eq("isActive", true))
+      .unique()
+    if (activeTree) {
+      throw new Error(
+        "An active Digital Trophy tree already exists; do not create another tree automatically."
+      )
+    }
+    await ctx.db.patch(preflight._id, { consumedAt: Date.now() })
+    return preflight
+  },
+})
+
 export const requestClaim = mutation({
   args: { fixtureId: v.number() },
   handler: async (ctx, args) => {

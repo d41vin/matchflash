@@ -91,6 +91,28 @@ test("a qualifying participant reserves one Devnet trophy atomically", async () 
   })
 })
 
+test("a Mainnet tree preflight can be consumed only once", async () => {
+  const t = convexTest(schema, modules)
+  const preflightId = await t.run(async (ctx) => {
+    return await ctx.db.insert("trophyTreePreflights", {
+      accountSizeBytes: 3864,
+      rentExemptLamports: "28000000",
+      createdAt: Date.now(),
+      expiresAt: Date.now() + 5 * 60_000,
+    })
+  })
+
+  await expect(
+    t.mutation(internal.trophies.reserveMainnetTreePreflight, { preflightId })
+  ).resolves.toMatchObject({
+    accountSizeBytes: 3864,
+    rentExemptLamports: "28000000",
+  })
+  await expect(
+    t.mutation(internal.trophies.reserveMainnetTreePreflight, { preflightId })
+  ).rejects.toThrow("Run a new Mainnet Digital Trophy preflight")
+})
+
 test("replay-only and non-participating fans cannot reserve a trophy", async () => {
   const t = convexTest(schema, modules)
   await activeDevnetTree(t)
@@ -164,7 +186,8 @@ test("a minted trophy is reported as claimed while its soulbound lock retries", 
       ctx.db.query("trophyClaims").first(),
       ctx.db.query("trophyEligibility").first(),
     ])
-    if (!claim || !eligibility) throw new Error("Expected a reserved trophy claim.")
+    if (!claim || !eligibility)
+      throw new Error("Expected a reserved trophy claim.")
     await ctx.db.patch(claim._id, {
       status: "claimed",
       soulboundStatus: "failed",

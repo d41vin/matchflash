@@ -1,7 +1,5 @@
 "use node"
 
-import { timingSafeEqual } from "node:crypto"
-
 import type { DasApiInterface } from "@metaplex-foundation/digital-asset-standard-api"
 import {
   createTreeV2,
@@ -23,7 +21,7 @@ import { createUmi } from "@metaplex-foundation/umi-bundle-defaults"
 import { v } from "convex/values"
 
 import { internal } from "./_generated/api"
-import type { Doc } from "./_generated/dataModel"
+import type { Doc, Id } from "./_generated/dataModel"
 import {
   action,
   env,
@@ -41,6 +39,13 @@ type ClaimReservation = Doc<"trophyClaims"> & {
   user: Doc<"users">
 }
 type SecuringReservation = Doc<"trophyClaims"> & { mintAddress: string }
+type MainnetTreePreflight = ReturnType<typeof mainnetTrophyTreePreflight>
+type ProvisionedMainnetTree = MainnetTreePreflight & {
+  treeAddress: string
+  collectionAddress: string
+  collectionTransactionSignature: string
+  treeTransactionSignature: string
+}
 
 const MAINNET_GENESIS_HASH = "5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp"
 const MAINNET_TREE_CREATION_APPROVAL = "CREATE_MAINNET_TROPHY_TREE"
@@ -169,50 +174,57 @@ function collectionMetadata() {
 
 export const preflightMainnetTree = action({
   args: {},
-  handler: async () => {
+  handler: async (
+    ctx
+  ): Promise<
+    MainnetTreePreflight & { preflightId: Id<"trophyTreePreflights"> }
+  > => {
     const preflight = await mainnetTreePreflight()
+    const preflightId: Id<"trophyTreePreflights"> = await ctx.runMutation(
+      internal.trophies.createMainnetTreePreflight,
+      {
+        accountSizeBytes: preflight.accountSizeBytes,
+        rentExemptLamports: preflight.rentExemptLamports,
+      }
+    )
     console.log("Mainnet Digital Trophy tree preflight", preflight)
-    return preflight
+    return { ...preflight, preflightId }
   },
 })
 
-function requireMainnetTreeOperator(
-  operatorSecret: string,
-  approval: typeof MAINNET_TREE_CREATION_APPROVAL
-) {
-  const expectedSecret = env.MATCHFLASH_TROPHY_OPERATOR_SECRET
-  if (!expectedSecret) {
-    throw new Error("The Mainnet tree operator secret is not configured.")
-  }
-  const expected = Buffer.from(expectedSecret)
-  const provided = Buffer.from(operatorSecret)
-  if (
-    expected.length !== provided.length ||
-    !timingSafeEqual(expected, provided) ||
-    approval !== MAINNET_TREE_CREATION_APPROVAL
-  ) {
-    throw new Error("Explicit Mainnet tree-creation approval is required.")
-  }
-}
-
-export const provisionMainnetTree = action({
+export const provisionMainnetTree = internalAction({
   args: {
-    operatorSecret: v.string(),
+    preflightId: v.id("trophyTreePreflights"),
     approval: v.literal(MAINNET_TREE_CREATION_APPROVAL),
   },
-  handler: async (ctx, args) => {
-    requireMainnetTreeOperator(args.operatorSecret, args.approval)
-    const activeTree: Doc<"merkleTrees"> | null = await ctx.runQuery(
-      internal.trophies.getActiveTree,
-      {}
+  handler: async (ctx, args): Promise<ProvisionedMainnetTree> => {
+    const quotedPreflight = await ctx.runQuery(
+      internal.trophies.getMainnetTreePreflight,
+      { preflightId: args.preflightId }
     )
-    if (activeTree) {
+    if (!quotedPreflight || quotedPreflight.consumedAt) {
       throw new Error(
-        "An active Digital Trophy tree already exists; do not create another tree automatically."
+        "Run a new Mainnet Digital Trophy preflight before approving tree creation."
       )
     }
-
-    const preflight = await mainnetTreePreflight()
+    const currentPreflight = await mainnetTreePreflight()
+    if (
+      currentPreflight.accountSizeBytes !== quotedPreflight.accountSizeBytes ||
+      currentPreflight.rentExemptLamports !== quotedPreflight.rentExemptLamports
+    ) {
+      throw new Error(
+        "The Mainnet rent quote changed; run and explicitly approve a new preflight."
+      )
+    }
+    const reservedPreflight: Doc<"trophyTreePreflights"> =
+      await ctx.runMutation(internal.trophies.reserveMainnetTreePreflight, {
+        preflightId: args.preflightId,
+      })
+    const preflight: MainnetTreePreflight = {
+      ...MAINNET_TROPHY_TREE_CONFIG,
+      accountSizeBytes: reservedPreflight.accountSizeBytes,
+      rentExemptLamports: reservedPreflight.rentExemptLamports,
+    }
     console.log("Approved Mainnet Digital Trophy tree creation", preflight)
     const umi = mainnetAuthority()
 
@@ -254,22 +266,26 @@ export const provisionMainnetTree = action({
       })
     ).sendAndConfirm(umi)
 
+    const collectionTransactionSignature = Buffer.from(
+      collectionTx.signature
+    ).toString("base64")
+    const treeTransactionSignature = Buffer.from(treeTx.signature).toString(
+      "base64"
+    )
     await ctx.runMutation(internal.trophies.registerMainnetTree, {
       treeAddress: merkleTree.publicKey,
       collectionAddress: collection.publicKey,
       capacity: MAINNET_TROPHY_TREE_CONFIG.capacity,
       treeRentLamports: preflight.rentExemptLamports,
-      collectionTransactionSignature: Buffer.from(
-        collectionTx.signature
-      ).toString("base64"),
-      treeTransactionSignature: Buffer.from(treeTx.signature).toString(
-        "base64"
-      ),
+      collectionTransactionSignature,
+      treeTransactionSignature,
     })
     return {
       ...preflight,
       treeAddress: merkleTree.publicKey,
       collectionAddress: collection.publicKey,
+      collectionTransactionSignature,
+      treeTransactionSignature,
     }
   },
 })
