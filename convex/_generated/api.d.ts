@@ -24,7 +24,9 @@ import type * as recaps from "../recaps.js";
 import type * as reconciliation from "../reconciliation.js";
 import type * as reliability from "../reliability.js";
 import type * as rooms from "../rooms.js";
+import type * as trophies from "../trophies.js";
 import type * as trophy_eligibility from "../trophy_eligibility.js";
+import type * as trophy_mint from "../trophy_mint.js";
 
 import type {
   ApiFromModules,
@@ -49,7 +51,9 @@ declare const fullApi: ApiFromModules<{
   reconciliation: typeof reconciliation;
   reliability: typeof reliability;
   rooms: typeof rooms;
+  trophies: typeof trophies;
   trophy_eligibility: typeof trophy_eligibility;
+  trophy_mint: typeof trophy_mint;
 }>;
 
 /**

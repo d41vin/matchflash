@@ -25,6 +25,9 @@ import type { DataModel } from "./dataModel.js";
  * Typesafe environment variables declared in `convex.config.ts`.
  */
 type Env = {
+  readonly MATCHFLASH_TROPHY_AUTHORITY_SECRET_KEY: string | undefined;
+  readonly MATCHFLASH_TROPHY_NETWORK: string | undefined;
+  readonly MATCHFLASH_TROPHY_RPC_URL: string | undefined;
   readonly MATCHFLASH_WORKER_SECRET: string;
 };
 

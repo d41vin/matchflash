@@ -68,12 +68,15 @@ export const get = query({
           Math.abs((right.probAfter ?? 0) - (right.probBefore ?? 0)) -
           Math.abs((left.probAfter ?? 0) - (left.probBefore ?? 0))
       )[0]
-    const dataQualityNotes = [...new Set([
-      ...((state.hadReliabilityIssue ?? reliabilityWasFlagged(state.reliability))
-        ? ["Some match data was flagged as unreliable during play."]
-        : []),
-      ...correctionNotes.map((note) => note.message),
-    ])]
+    const dataQualityNotes = [
+      ...new Set([
+        ...((state.hadReliabilityIssue ??
+        reliabilityWasFlagged(state.reliability))
+          ? ["Some match data was flagged as unreliable during play."]
+          : []),
+        ...correctionNotes.map((note) => note.message),
+      ]),
+    ]
 
     const shared = {
       fixtureId: fixture.fixtureId,
@@ -88,7 +91,9 @@ export const get = query({
       biggestSwing: biggestSwing
         ? {
             title: biggestSwing.title,
-            change: Math.abs(biggestSwing.probAfter! - biggestSwing.probBefore!),
+            change: Math.abs(
+              biggestSwing.probAfter! - biggestSwing.probBefore!
+            ),
           }
         : null,
       peakHeat: state.peakHeat ?? state.heat ?? null,
@@ -106,6 +111,13 @@ export const get = query({
       .unique()
     if (!eligibility) return { shared, participant: null }
 
+    const claim = await db
+      .query("trophyClaims")
+      .withIndex("by_userId_and_fixtureId", (query) =>
+        query.eq("userId", user._id).eq("fixtureId", args.fixtureId)
+      )
+      .unique()
+
     const predictions = []
     for (const prediction of await db
       .query("predictions")
@@ -114,7 +126,9 @@ export const get = query({
       .take(500)) {
       const prompt = await db.get("predictionPrompts", prediction.promptId)
       if (prompt?.fixtureId !== args.fixtureId) continue
-      const option = prompt.options.find((entry) => entry.id === prediction.optionId)
+      const option = prompt.options.find(
+        (entry) => entry.id === prediction.optionId
+      )
       predictions.push({
         promptId: prompt._id,
         question: prompt.question,
@@ -150,6 +164,13 @@ export const get = query({
           eligibleAt: eligibility.eligibleAt,
           claimStatus: eligibility.claimStatus,
         },
+        trophy: claim
+          ? {
+              status: claim.status,
+              mintAddress: claim.mintAddress ?? null,
+              failureMessage: claim.failureMessage ?? null,
+            }
+          : null,
         predictions,
         matchStanding:
           rank > 0
@@ -173,7 +194,9 @@ export const history = query({
 
     const eligibility = await db
       .query("trophyEligibility")
-      .withIndex("by_userId_and_fixtureId", (query) => query.eq("userId", user._id))
+      .withIndex("by_userId_and_fixtureId", (query) =>
+        query.eq("userId", user._id)
+      )
       .order("desc")
       .take(100)
     const history = []

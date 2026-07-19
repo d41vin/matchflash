@@ -354,7 +354,52 @@ export const schema = defineSchema({
     userId: v.id("users"),
     fixtureId: v.number(),
     eligibleAt: v.number(),
-    claimStatus: v.literal("unclaimed"),
+    claimStatus: v.union(
+      v.literal("unclaimed"),
+      v.literal("minting"),
+      v.literal("claimed"),
+      v.literal("failed")
+    ),
+  }).index("by_userId_and_fixtureId", ["userId", "fixtureId"]),
+
+  // A tree is provisioned by an operator. Claiming only ever targets the one
+  // active, non-public Devnet tree and reserves a leaf before it schedules an
+  // on-chain mint.
+  merkleTrees: defineTable({
+    treeAddress: v.string(),
+    collectionAddress: v.string(),
+    capacity: v.number(),
+    mintedCount: v.number(),
+    isActive: v.boolean(),
+    createdAt: v.number(),
+  }).index("by_isActive", ["isActive"]),
+
+  // The `(userId, fixtureId)` lookup is the transactional anti-double-claim
+  // guard. A record is written before any non-transactional chain work starts.
+  trophyClaims: defineTable({
+    userId: v.id("users"),
+    fixtureId: v.number(),
+    treeId: v.id("merkleTrees"),
+    treeAddress: v.string(),
+    collectionAddress: v.string(),
+    leafIndex: v.number(),
+    status: v.union(
+      v.literal("minting"),
+      v.literal("claimed"),
+      v.literal("failed")
+    ),
+    soulboundStatus: v.optional(
+      v.union(v.literal("pending"), v.literal("locked"), v.literal("failed"))
+    ),
+    soulboundAttemptCount: v.optional(v.number()),
+    mintAddress: v.optional(v.string()),
+    metadataStorageId: v.optional(v.id("_storage")),
+    metadataUrl: v.optional(v.string()),
+    transactionSignature: v.optional(v.string()),
+    soulboundTransactionSignature: v.optional(v.string()),
+    failureMessage: v.optional(v.string()),
+    claimedAt: v.optional(v.number()),
+    createdAt: v.number(),
   }).index("by_userId_and_fixtureId", ["userId", "fixtureId"]),
 })
 

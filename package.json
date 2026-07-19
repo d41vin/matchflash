@@ -17,6 +17,11 @@
   },
   "dependencies": {
     "@base-ui/react": "^1.6.0",
+    "@metaplex-foundation/digital-asset-standard-api": "2.0.0",
+    "@metaplex-foundation/mpl-bubblegum": "5.0.2",
+    "@metaplex-foundation/mpl-core": "1.10.0",
+    "@metaplex-foundation/umi": "1.1.1",
+    "@metaplex-foundation/umi-bundle-defaults": "1.1.1",
     "@phantom/react-sdk": "^2.0.2",
     "@shadcn/react": "^0.2.1",
     "@solana/spl-token": "0.4.14",
